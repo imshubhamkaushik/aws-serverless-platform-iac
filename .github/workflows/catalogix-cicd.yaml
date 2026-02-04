@@ -2,7 +2,7 @@ name: Catalogix CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 # Prevent overlapping deployments - Equivalent to Jenkins:
 # options { disableConcurrentBuilds() }
@@ -12,7 +12,7 @@ concurrency:
 
 # Global permissions (recommended best practice)
 permissions:
-  id-token: write   # Required for AWS OIDC
+  id-token: write # Required for AWS OIDC
   contents: read
 
 # Global environment variables
@@ -90,7 +90,7 @@ jobs:
       - name: Build Frontend
         run: |
           cd frontend-svc
-          npm ci
+          npm install || npm ci
           npm run build
 
   # Phase 2: Docker Build, Security Scan & Push to ECR
