@@ -1,0 +1,37 @@
+How to set up GitHub Secrets (step-by-step)
+
+This is the next real action, and it’s simple.
+
+Step 1: Go to your GitHub repo
+Repo → Settings → Secrets and variables → Actions
+
+Step 2: Add the required secret
+
+Click “New repository secret”
+
+Secret 1 (REQUIRED)
+Field	Value
+Name	GITHUB_OIDC_ROLE_ARN
+Value	arn:aws:iam::<ACCOUNT_ID>:role/<ROLE_NAME>
+
+Example:
+
+arn:aws:iam::123456789012:role/github-actions-oidc-role
+
+
+This role will be created later via Terraform.
+
+Optional (future — do NOT add now unless ready)
+Secret	When
+SONAR_TOKEN	When SonarQube exists
+SONAR_HOST_URL	Same
+Step 3: Verify secret availability
+
+You don’t need to print it.
+
+This line in the workflow will fail loudly if it’s missing:
+
+role-to-assume: ${{ env.IAM_ROLE_ARN }}
+
+
+That’s enough validation.
