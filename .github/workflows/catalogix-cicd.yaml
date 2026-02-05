@@ -143,8 +143,6 @@ jobs:
 
       # -------- Push Image to ECR --------
       - name: Push image to ECR
-        env:
-          IMAGE_TAG: ${{ env.MAJOR_VERSION }}-${{ github.run_number }}
         run: |
           docker push \
             ${{ steps.login-ecr.outputs.registry }}/${{ matrix.service }}:${IMAGE_TAG}
@@ -152,7 +150,6 @@ jobs:
       # -------- Deploy to ECS --------
       - name: Deploy to ECS
         env:
-          IMAGE_TAG: ${{ env.MAJOR_VERSION }}-${{ github.run_number }}
           CLUSTER_NAME: catalogix-cluster
           SERVICE_NAME: ${{ matrix.service }}
           TASK_FAMILY: ${{ matrix.service }}
