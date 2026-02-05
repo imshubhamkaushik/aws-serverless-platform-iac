@@ -1,6 +1,4 @@
-############################
 # RDS SUBNET GROUP
-############################
 # Tells AWS which subnets RDS is allowed to use.
 # These are PRIVATE subnets only.
 
@@ -9,9 +7,7 @@ resource "aws_db_subnet_group" "this" {
   subnet_ids = aws_subnet.private[*].id
 }
 
-############################
 # RDS POSTGRESQL INSTANCE
-############################
 # Managed PostgreSQL database.
 # Single-AZ, small instance → cost-aware for dev.
 

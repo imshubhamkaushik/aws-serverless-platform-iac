@@ -119,11 +119,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
       
-      # -------- Ensure ECR Repository Exists --------
-      - name: Ensure ECR repository exists
-        run: |
-          aws ecr describe-repositories --repository-names ${{ matrix.service }} --region ${{ env.AWS_REGION }} || \
-          aws ecr create-repository --repository-name ${{ matrix.service }} --region ${{ env.AWS_REGION }}
+      # # -------- Ensure ECR Repository Exists (Not needed if mentioned in terraform files) --------
+      # - name: Ensure ECR repository exists
+      #   run: |
+      #     aws ecr describe-repositories --repository-names ${{ matrix.service }} --region ${{ env.AWS_REGION }} || \
+      #     aws ecr create-repository --repository-name ${{ matrix.service }} --region ${{ env.AWS_REGION }}
 
       # -------- Login to Amazon ECR --------
       - name: Login to Amazon ECR

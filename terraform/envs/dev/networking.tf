@@ -1,3 +1,12 @@
+# NOTE:
+# No NAT Gateway is created by design.
+# This is a cost-aware dev setup where:
+# - ECS tasks run in public subnets
+# - RDS runs in private subnets
+# - No outbound internet access is required from private subnets
+# In production, a NAT Gateway or VPC endpoints would be added.
+
+# VPC
 resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true

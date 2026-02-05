@@ -1,3 +1,9 @@
+# NOTE:
+# HTTP listener only.
+# HTTPS/ACM is intentionally excluded for dev scope.
+# In production, ACM + HTTPS listener would be added.
+
+# APPLICATION LOAD BALANCER
 resource "aws_lb" "this" {
   name               = "${var.project_name}-alb"
   load_balancer_type = "application"
@@ -5,6 +11,7 @@ resource "aws_lb" "this" {
   security_groups    = [aws_security_group.alb.id]
 }
 
+# HTTP LISTENER
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
   port              = 80

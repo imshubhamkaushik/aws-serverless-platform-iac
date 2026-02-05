@@ -1,3 +1,4 @@
+# Not used currently, but can be used in the future for GitHub Actions OIDC-based authentication to AWS.
 resource "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 
