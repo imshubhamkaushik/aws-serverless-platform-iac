@@ -128,7 +128,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            -t ${{ steps.login-ecr.outputs.registry }}/${{ matrix.service }}:${env.IMAGE_TAG} \
+            -t ${{ steps.login-ecr.outputs.registry }}/${{ matrix.service }}:$IMAGE_TAG \
             ./${{ matrix.service }}
 
       # -------- Application Image Security Scan (Trivy) --------
