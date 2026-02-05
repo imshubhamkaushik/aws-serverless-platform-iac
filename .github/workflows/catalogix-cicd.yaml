@@ -90,7 +90,7 @@ jobs:
       - name: Build Frontend
         run: |
           cd frontend-svc
-          npm install
+          npm install || npm ci
           npm run build
 
   # Phase 2: Docker Build, Security Scan & Push to ECR
