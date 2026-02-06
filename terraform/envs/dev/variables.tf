@@ -25,11 +25,6 @@ variable "public_subnet_cidrs" {
   type        = list(string)
 }
 
-variable "github_repo" {
-  description = "GitHub repo allowed to deploy (org/repo)"
-  type        = string
-}
-
 variable "db_name" {
   description = "PostgreSQL database name"
   type        = string

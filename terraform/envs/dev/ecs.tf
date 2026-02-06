@@ -10,7 +10,7 @@ resource "aws_ecs_cluster" "this" {
 # Each ECS service needs its own target group.
 # Target type MUST be "ip" for Fargate.
 
-resource "aws_lb_target_group" "frontend-svc" {
+resource "aws_lb_target_group" "frontend_svc" {
   name        = "${var.project_name}-frontend-svc-tg"
   port        = 80
   protocol    = "HTTP"
@@ -253,8 +253,8 @@ resource "aws_ecs_service" "frontend_svc" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = aws_subnet.public[*].id
-    security_groups = [aws_security_group.ecs_service.id]
+    subnets          = aws_subnet.public[*].id
+    security_groups  = [aws_security_group.ecs_service.id]
     assign_public_ip = true
   }
 
@@ -277,15 +277,15 @@ resource "aws_ecs_service" "user_svc" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = aws_subnet.public[*].id
-    security_groups = [aws_security_group.ecs_service.id]
+    subnets          = aws_subnet.public[*].id
+    security_groups  = [aws_security_group.ecs_service.id]
     assign_public_ip = true
   }
 
   load_balancer {
     target_group_arn = aws_lb_target_group.user_svc.arn
     container_name   = "user-svc"
-    container_port   = 8080
+    container_port   = 8081
   }
 
   depends_on = [aws_lb_listener.http]
@@ -301,20 +301,20 @@ resource "aws_ecs_service" "product_svc" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = aws_subnet.public[*].id
-    security_groups = [aws_security_group.ecs_service.id]
+    subnets          = aws_subnet.public[*].id
+    security_groups  = [aws_security_group.ecs_service.id]
     assign_public_ip = true
   }
 
   load_balancer {
     target_group_arn = aws_lb_target_group.product_svc.arn
     container_name   = "product-svc"
-    container_port   = 8080
+    container_port   = 8082
   }
 
   depends_on = [aws_lb_listener.http]
 
-  
+
 }
 
 
