@@ -29,10 +29,14 @@ resource "aws_lb_target_group" "frontend_svc" {
 
 resource "aws_lb_target_group" "user_svc" {
   name        = "${var.project_name}-user-svc-tg"
-  port        = 8080
+  port        = 8081
   protocol    = "HTTP"
   vpc_id      = aws_vpc.this.id
   target_type = "ip"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 
   health_check {
     path                = "/actuator/health"
@@ -41,15 +45,20 @@ resource "aws_lb_target_group" "user_svc" {
     timeout             = 5
     interval            = 30
     matcher             = "200"
+    port                = "8081"
   }
 }
 
 resource "aws_lb_target_group" "product_svc" {
   name        = "${var.project_name}-product-svc-tg"
-  port        = 8080
+  port        = 8082
   protocol    = "HTTP"
   vpc_id      = aws_vpc.this.id
   target_type = "ip"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 
   health_check {
     path                = "/actuator/health"
@@ -58,41 +67,7 @@ resource "aws_lb_target_group" "product_svc" {
     timeout             = 5
     interval            = 30
     matcher             = "200"
-  }
-}
-
-# ALB LISTENER RULES
-# Path-based routing keeps cost low (single ALB).
-
-resource "aws_lb_listener_rule" "user_svc" {
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 10
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.user_svc.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/users*", "/users/*"]
-    }
-  }
-}
-
-resource "aws_lb_listener_rule" "product_svc" {
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 20
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.product_svc.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/products*", "/products/*"]
-    }
+    port                = "8082"
   }
 }
 
@@ -155,6 +130,7 @@ resource "aws_ecs_task_definition" "user_svc" {
       portMappings = [
         {
           containerPort = 8081
+          hostPort      = 8081
           protocol      = "tcp"
         }
       ]
@@ -205,6 +181,7 @@ resource "aws_ecs_task_definition" "product_svc" {
       portMappings = [
         {
           containerPort = 8082
+          hostPort      = 8082
           protocol      = "tcp"
         }
       ]
@@ -270,11 +247,12 @@ resource "aws_ecs_service" "frontend_svc" {
 # USER SERVICE
 
 resource "aws_ecs_service" "user_svc" {
-  name            = "user-svc"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.user_svc.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                              = "user-svc"
+  cluster                           = aws_ecs_cluster.this.id
+  task_definition                   = aws_ecs_task_definition.user_svc.arn
+  desired_count                     = 1
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = 60
 
   network_configuration {
     subnets          = aws_subnet.public[*].id
@@ -294,11 +272,12 @@ resource "aws_ecs_service" "user_svc" {
 # PRODUCT SERVICE
 
 resource "aws_ecs_service" "product_svc" {
-  name            = "product-svc"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.product_svc.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                              = "product-svc"
+  cluster                           = aws_ecs_cluster.this.id
+  task_definition                   = aws_ecs_task_definition.product_svc.arn
+  desired_count                     = 1
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = 60
 
   network_configuration {
     subnets          = aws_subnet.public[*].id
@@ -313,7 +292,6 @@ resource "aws_ecs_service" "product_svc" {
   }
 
   depends_on = [aws_lb_listener.http]
-
 
 }
 

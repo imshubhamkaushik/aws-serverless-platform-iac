@@ -32,4 +32,8 @@ resource "aws_db_instance" "postgres" {
   deletion_protection = false
 
   backup_retention_period = 0
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
