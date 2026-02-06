@@ -134,14 +134,14 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            -t ${{ steps.login-ecr.outputs.registry }}/${{ matrix.service }}:$IMAGE_TAG \
+            -t ${{ steps.login-ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:$IMAGE_TAG \
             ./${{ matrix.service }}
 
       # -------- Application Image Security Scan (Trivy) --------
       - name: Trivy Image Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ matrix.service }}:${{ env.IMAGE_TAG }}
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ env.IMAGE_TAG }}
           format: table
           severity: CRITICAL,HIGH
           exit-code: "1"
@@ -151,14 +151,14 @@ jobs:
       - name: Push image to ECR
         run: |
           docker push \
-            ${{ steps.login-ecr.outputs.registry }}/${{ matrix.service }}:${IMAGE_TAG}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${IMAGE_TAG}
 
       # -------- Deploy to ECS --------
       - name: Deploy to ECS
         env:
           CLUSTER_NAME: ${{ env.APP_NAME }}-cluster
           SERVICE_NAME: ${{ matrix.service }}
-          TASK_FAMILY: ${{ env.APP_NAME }}-$SERVICE_NAME
+          TASK_FAMILY: ${{ env.APP_NAME }}-${{ matrix.service}}
         run: |
           set -e
 
@@ -166,12 +166,13 @@ jobs:
 
           TASK_DEF_JSON=$(aws ecs describe-task-definition \
             --task-definition $TASK_FAMILY \
+            --region ${{ env.AWS_REGION }} \
             --query taskDefinition)
 
           echo "Updating container image"
 
           NEW_TASK_DEF=$(echo "$TASK_DEF_JSON" | jq \
-            --arg IMAGE "${{ steps.login-ecr.outputs.registry }}/${{ matrix.service }}:${IMAGE_TAG}" \
+            --arg IMAGE "${{ steps.login-ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${IMAGE_TAG}" \
             '.containerDefinitions[0].image = $IMAGE
              | del(
                  .taskDefinitionArn,
