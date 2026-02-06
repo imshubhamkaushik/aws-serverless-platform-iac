@@ -147,6 +147,10 @@ resource "aws_ecs_task_definition" "user_svc" {
         {
           name  = "SPRING_DATASOURCE_PASSWORD"
           value = var.db_password
+        },
+        {
+          name = "ALLOWED_ORIGINS"
+          value = "*"
         }
       ]
 
@@ -198,6 +202,10 @@ resource "aws_ecs_task_definition" "product_svc" {
         {
           name  = "SPRING_DATASOURCE_PASSWORD"
           value = var.db_password
+        },
+        {
+          name = "ALLOWED_ORIGINS"
+          value = "*"
         }
       ]
 
