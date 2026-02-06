@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import PropTypes from "prop-types";
 import { createProduct } from "../api";
 
-const ProductForm = ({ onProductAdded }) => {
+const ProductForm = ({ userId, onProductAdded }) => {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -22,7 +22,7 @@ const ProductForm = ({ onProductAdded }) => {
 
     setSubmitting(true);
     try {
-      await createProduct({ name: name.trim(), price: numericPrice });
+      await createProduct({ name: name.trim(), price: numericPrice }, userId);
       setName("");
       setPrice("");
       if (onProductAdded) onProductAdded();
@@ -63,6 +63,7 @@ const ProductForm = ({ onProductAdded }) => {
 
 //Add Prop Validation
 ProductForm.propTypes = {
+  userId: PropTypes.string.isRequired,
   onProductAdded: PropTypes.func,
 }
 

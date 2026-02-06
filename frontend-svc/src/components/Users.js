@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { getUsers, deleteUser } from "../api";
 import UserForm from "./UserForm";
 
-const Users = () => {
+const Users = (onUserSelected) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -86,6 +86,7 @@ const Users = () => {
                   {u.email}
                 </td>
                 <td style={{ border: "1px solid #ccc", padding: "8px" }}>
+                  <button onClick={() => onUserSelected(u)}>Use</button>
                   <button onClick={() => handleDelete(u.id)}>Delete</button>
                 </td>
               </tr>

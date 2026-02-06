@@ -2,10 +2,14 @@ import React, { useEffect, useState } from "react";
 import { getProducts, deleteProduct } from "../api";
 import ProductForm from "./ProductForm";
 
-const Products = () => {
+const Products = (currentUser) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  if(!currentUser) {
+    return <p>Please select a user.</p>
+  }
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -23,7 +27,7 @@ const Products = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [currentUser]);
 
   const handleProductAdded = () => {
     fetchProducts();
@@ -45,7 +49,7 @@ const Products = () => {
     <div style={{ padding: "20px" }}>
       <h2>Products</h2>
 
-      <ProductForm onProductAdded={handleProductAdded} />
+      <ProductForm userId={currentUser.id} onProductAdded={handleProductAdded} />
 
       {loading && <p>Loading products...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
