@@ -13,8 +13,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/products")
-@CrossOrigin(origins = {"http://localhost:3000", "http://shop.local"}) // allow requests from frontend
+@RequestMapping("/products")
 public class ProductController {
 
     private final ProductRepository repo;

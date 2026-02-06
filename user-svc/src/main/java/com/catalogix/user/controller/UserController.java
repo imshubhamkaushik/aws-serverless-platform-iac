@@ -14,8 +14,7 @@ import java.net.URI;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/users")
-@CrossOrigin(origins = {"http://localhost:3000", "http://shop.local"}) // allow requests from frontend
+@RequestMapping("/users")
 public class UserController {
 
     private final UserSvc svc;
