@@ -40,7 +40,7 @@ class UserControllerTest {
         when(svc.register(any()))
                 .thenReturn(new UserResponse(1L, "John", "john@example.com"));
 
-        mvc.perform(post("/api/users/register")
+        mvc.perform(post("/users/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(req)))
                 .andDo(print())
