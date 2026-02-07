@@ -32,6 +32,9 @@ export const deleteUser = async (id) => {
 // --------PRODUCT APIs--------
 
 export const getProducts = async (userId) => {
+  if (!userId) {
+    throw new Error("User ID is required");
+  }
   const res = await axios.get(PRODUCT_API_BASE, {
     headers: {
       'X-USER-ID': userId,
@@ -41,6 +44,10 @@ export const getProducts = async (userId) => {
 };
 
 export const createProduct = async (product, userId) => {
+
+  if (!userId) {
+    throw new Error("User ID is required");
+  }
   const res = await axios.post(PRODUCT_API_BASE, product, {
     headers: {
       'X-USER-ID': userId,
@@ -50,6 +57,9 @@ export const createProduct = async (product, userId) => {
 };
 
 export const deleteProduct = async (id, userId) => {
+  if (!userId) {
+    throw new Error("User ID is required");
+  }
   const res = await axios.delete(`${PRODUCT_API_BASE}/${id}`, {
     headers: {
       'X-USER-ID': userId,

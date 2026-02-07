@@ -7,7 +7,7 @@ const Products = (currentUser) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  if(!currentUser) {
+  if(!currentUser || !currentUser.id) {
     return <p>Please select a user.</p>
   }
 

@@ -46,7 +46,7 @@ const Users = (onUserSelected) => {
     <div style={{ padding: "20px" }}>
       <h2>Users</h2>
 
-      <UserForm onUserAdded={handleUserAdded} />
+      <UserForm onUserAdded={fetchUsers} />
 
       {loading && <p>Loading users...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}

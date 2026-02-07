@@ -1,17 +1,17 @@
 resource "aws_ecr_repository" "frontend_svc" {
-  name = "${var.project_name}-frontend-svc"
+  name                 = "${var.project_name}-frontend-svc"
   image_tag_mutability = "MUTABLE"
   force_delete         = true # Not suitable for production
 }
 
 resource "aws_ecr_repository" "user_svc" {
-  name = "${var.project_name}-user-svc"
+  name                 = "${var.project_name}-user-svc"
   image_tag_mutability = "MUTABLE"
   force_delete         = true # Not suitable for production
 }
 
 resource "aws_ecr_repository" "product_svc" {
-  name = "${var.project_name}-product-svc"
+  name                 = "${var.project_name}-product-svc"
   image_tag_mutability = "MUTABLE"
   force_delete         = true # Not suitable for production
 }

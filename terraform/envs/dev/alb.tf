@@ -36,7 +36,7 @@ resource "aws_lb_listener_rule" "user_svc" {
   condition {
     path_pattern {
       # ADDED: /actuator/* so health checks reach the correct service
-      values = ["/users*", "/users/*", "/actuator/health", "/actuator/*"]
+      values = ["/users*", "/users/*", "/health"]
     }
   }
 }
@@ -54,7 +54,7 @@ resource "aws_lb_listener_rule" "product_svc" {
   condition {
     path_pattern {
       # ADDED: Actuator paths for product service
-      values = ["/products*", "/products/*", "/actuator/health", "/actuator/*"]
+      values = ["/products*", "/products/*", "/health"]
     }
   }
 }

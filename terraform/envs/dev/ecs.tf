@@ -39,7 +39,7 @@ resource "aws_lb_target_group" "user_svc" {
   }
 
   health_check {
-    path                = "/actuator/health"
+    path                = "/health"
     healthy_threshold   = 2
     unhealthy_threshold = 2
     timeout             = 5
@@ -61,7 +61,7 @@ resource "aws_lb_target_group" "product_svc" {
   }
 
   health_check {
-    path                = "/actuator/health"
+    path                = "/health"
     healthy_threshold   = 2
     unhealthy_threshold = 2
     timeout             = 5
@@ -149,7 +149,7 @@ resource "aws_ecs_task_definition" "user_svc" {
           value = var.db_password
         },
         {
-          name = "ALLOWED_ORIGINS"
+          name  = "ALLOWED_ORIGINS"
           value = "*"
         }
       ]
@@ -204,7 +204,7 @@ resource "aws_ecs_task_definition" "product_svc" {
           value = var.db_password
         },
         {
-          name = "ALLOWED_ORIGINS"
+          name  = "ALLOWED_ORIGINS"
           value = "*"
         }
       ]
@@ -260,7 +260,7 @@ resource "aws_ecs_service" "user_svc" {
   task_definition                   = aws_ecs_task_definition.user_svc.arn
   desired_count                     = 1
   launch_type                       = "FARGATE"
-  health_check_grace_period_seconds = 60
+  health_check_grace_period_seconds = 90
 
   network_configuration {
     subnets          = aws_subnet.public[*].id
@@ -285,7 +285,7 @@ resource "aws_ecs_service" "product_svc" {
   task_definition                   = aws_ecs_task_definition.product_svc.arn
   desired_count                     = 1
   launch_type                       = "FARGATE"
-  health_check_grace_period_seconds = 60
+  health_check_grace_period_seconds = 90
 
   network_configuration {
     subnets          = aws_subnet.public[*].id
