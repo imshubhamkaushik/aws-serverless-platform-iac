@@ -21,7 +21,7 @@ env:
 
 jobs:
   context:
-    name: 🧩 Phase 0 -- Pipeline Context
+    name: Phase 0 -- Pipeline Context🧩
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.tag.outputs.image_tag }}
@@ -38,7 +38,7 @@ jobs:
 # PHASE 1A — FRONTEND BUILD
 
   build-frontend-svcs:
-    name: 🧪 Phase 1A -- Build Frontend - ${{ matrix.service }}
+    name: "Phase 1A -- Build Frontend🧪"
     runs-on: ubuntu-22.04
     needs: context
 
@@ -48,7 +48,8 @@ jobs:
         service: [frontend-svc]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -57,7 +58,7 @@ jobs:
           cache: npm
           cache-dependency-path: ${{ matrix.service }}/package-lock.json
 
-      - name: Build ${{ matrix.service }}
+      - name: Build Service - ${{ matrix.service }}
         run: |
           cd ${{ matrix.service }}
           npm ci
@@ -66,7 +67,7 @@ jobs:
 # PHASE 1B — BACKEND BUILD & TEST
 
   build-backend-svcs:
-    name: 🧪 Phase 1B -- Build & Test Backend - ${{ matrix.service }}
+    name: Phase 1B -- Build & Test Backend 🧪
     runs-on: ubuntu-22.04
     needs: build-frontend-svcs
 
@@ -76,7 +77,8 @@ jobs:
         service: [user-svc, product-svc]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -102,7 +104,7 @@ jobs:
 # PHASE 2 — DOCKER OPERATIONS (BUILD, SCAN, PUSH)
 
   docker-ops:
-    name: 🐳 Phase 2 -- Docker Build - ${{ matrix.service }}
+    name: Phase 2 -- Docker Build, Security Scan, Image Push 🐳
     runs-on: ubuntu-latest
     needs: 
       - context
@@ -114,24 +116,27 @@ jobs:
         service: [user-svc, product-svc, frontend-svc]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
         id: ecr
 
-      - name: Build Docker image
+      - name: Build Docker image - ${{ matrix.service }}
         run: |
           docker build \
             -t ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }} \
             ./${{ matrix.service }}
       
-      - name: Trivy Security Scan
+      - name: Trivy Security Scan - ${{ matrix.service }}
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }}
@@ -139,7 +144,7 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
 
-      - name: Push image to ECR
+      - name: Push image to ECR - ${{ matrix.service }}
         run: |
           docker push \
             ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }}
@@ -147,7 +152,7 @@ jobs:
 # PHASE 3 — DEPLOY TO ECS
 
   deploy:
-    name: 🚀 Phase 3 -- Deploy to ECS - ${{ matrix.service }}
+    name:  Phase 3 -- Deploy to ECS 🚀
     runs-on: ubuntu-latest
     needs: docker-ops
 
@@ -163,7 +168,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Update ECS Service
+      - name: Update ECS Service - ${{ matrix.service }}
         run: |
           aws ecs update-service \
             --cluster ${{ env.APP_NAME }}-cluster \
@@ -173,7 +178,7 @@ jobs:
 # FINAL — PIPELINE RESULT
 
   pipeline-summary:
-    name: 📊 Pipeline Result
+    name: Final Pipeline Summary 📊
     runs-on: ubuntu-latest
     if: always()
     needs:
@@ -188,20 +193,20 @@ jobs:
 
           echo ""
           echo "Frontend Services:"
-          echo "  - frontend-svc : ${{ needs.build-frontend-svcs.result }}"
+          echo " - frontend-svc     : ${{ needs.build-frontend-svcs.result }}"
 
           echo ""
           echo "Backend Services:"
-          echo "  - user-svc     : ${{ needs.build-backend-svcs.result }}"
-          echo "  - product-svc  : ${{ needs.build-backend-svcs.result }}"
+          echo " - user-svc         : ${{ needs.build-backend-svcs.result }}"
+          echo " - product-svc      : ${{ needs.build-backend-svcs.result }}"
 
           echo ""
           echo "Docker Ops:"
-          echo "  - Build/Scan/Push : ${{ needs.docker-ops.result }}"
+          echo " - Build/Scan/Push  : ${{ needs.docker-ops.result }}"
 
           echo ""
           echo "Deployment:"
-          echo "  - Deploy to ECS      : ${{ needs.deploy.result }}"
+          echo " - Deploy to ECS    : ${{ needs.deploy.result }}"
 
           echo ""
           echo "=================================================="
@@ -212,8 +217,8 @@ jobs:
             "${{ needs.docker-ops.result }}" != "success" || \
             "${{ needs.deploy.result }}" != "success" \
           ]]; then
-            echo "❌ Catalogix pipeline FAILED"
+            echo "Catalogix pipeline FAILED ❌"
             exit 1
           else
-            echo "✅ Catalogix pipeline SUCCESS"
+            echo "Catalogix pipeline SUCCESS ✅"
           fi
