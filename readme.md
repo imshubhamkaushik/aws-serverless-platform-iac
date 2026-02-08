@@ -197,3 +197,15 @@ If you want next:
 - “how to defend design choices”
 
 Just say the word. -->
+
+### Static Code Analysis
+
+This project integrates Sonar-based static code analysis.
+
+- SonarQube was used locally during development for code quality validation.
+- CI pipeline steps are SonarCloud-compatible and can be enabled by providing
+  SonarCloud credentials and organization details.
+- Sonar analysis is configured as non-blocking to prioritize deployment flow.
+
+This approach avoids introducing persistent analysis infrastructure while
+keeping the pipeline production-ready.
