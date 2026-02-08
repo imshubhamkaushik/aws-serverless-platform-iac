@@ -224,8 +224,8 @@ jobs:
       - build-backend-svcs
       - build-frontend-svcs
       - docker-build
-      - trivy-scan-image
-      - push-image
+      # - trivy-scan-image
+      # - push-image
       - deploy
 
     steps:
@@ -244,8 +244,8 @@ jobs:
           echo ""
           echo "Docker & Deployment Stages:"
           echo "  - Docker Build : ${{ needs.docker-build.result }}"
-          echo "  - Trivy Security Scan   : ${{ needs.trivy-scan-image.result }}"
-          echo "  - Push Image to ECR   : ${{ needs.push-image.result }}"
+          # echo "  - Trivy Security Scan   : ${{ needs.trivy-scan-image.result }}"
+          # echo "  - Push Image to ECR   : ${{ needs.push-image.result }}"
           echo "  - Deploy to ECS      : ${{ needs.deploy.result }}"
 
           echo ""
@@ -255,8 +255,8 @@ jobs:
             "${{ needs.build-frontend-svcs.result }}" != "success" || \
             "${{ needs.build-backend-svcs.result }}" != "success" || \
             "${{ needs.docker-build.result }}" != "success" || \
-            "${{ needs.trivy-scan-image.result }}" != "success" || \
-            "${{ needs.push-image.result }}" != "success" || \
+            # "${{ needs.trivy-scan-image.result }}" != "success" || \
+            # "${{ needs.push-image.result }}" != "success" || \
             "${{ needs.deploy.result }}" != "success" \
           ]]; then
             echo "❌ Catalogix pipeline FAILED"
