@@ -136,7 +136,7 @@ jobs:
   trivy-scan-image:
     name: 🔐 Phase 3 -- Trivy Security Scan - ${{ matrix.service }}
     runs-on: ubuntu-latest
-    needs: docker-build
+    needs: [context, docker-build]
 
     strategy:
       matrix:
@@ -165,7 +165,7 @@ jobs:
   push-image:
     name: 📦 Phase 4 -- Push Image to ECR - ${{ matrix.service }}
     runs-on: ubuntu-latest
-    needs: trivy-scan-image
+    needs: [context, trivy-scan-image]
 
     strategy:
       matrix:
