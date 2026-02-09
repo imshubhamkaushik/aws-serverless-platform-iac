@@ -237,6 +237,10 @@ resource "aws_ecs_service" "frontend_svc" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
+
   network_configuration {
     subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.ecs_service.id]
@@ -262,6 +266,10 @@ resource "aws_ecs_service" "user_svc" {
   launch_type                       = "FARGATE"
   health_check_grace_period_seconds = 90
 
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
+
   network_configuration {
     subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.ecs_service.id]
@@ -286,6 +294,10 @@ resource "aws_ecs_service" "product_svc" {
   desired_count                     = 1
   launch_type                       = "FARGATE"
   health_check_grace_period_seconds = 90
+
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 
   network_configuration {
     subnets          = aws_subnet.public[*].id
