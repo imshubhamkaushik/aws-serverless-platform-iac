@@ -170,7 +170,7 @@ jobs:
 
       - name: Download Task Definition
         run: |
-          aws ecs describe-task-definition --task-definition ${{ matrix.service }} --query taskDefinition > task-definition.json
+          aws ecs describe-task-definition --task-definition ${{ env.APP_NAME }}-${{ matrix.service }} --query taskDefinition > task-definition.json
 
       - name: Render new task definition
         run: |
