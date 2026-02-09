@@ -1,37 +1,98 @@
 # Cloud-Native Infrastructure Automation & Serverless Container Deployment on AWS
 
-This repository contains a **DevOps-focused AWS platform** designed to provision, deploy, and operate multiple application services using **Terraform, ECS Fargate, and GitHub Actions**.
+This repository demonstrates the **design, provisioning, and operation of a production-style cloud platform on AWS**, using **Infrastructure as Code, container orchestration, and CI/CD automation**.
 
 The primary goal of this project is to demonstrate **infrastructure design, CI/CD workflows, and service deployment strategies**, rather than application-level complexity.
 
 ---
 
-## 🧠 Project Overview
+## 🎯 Project Goals
 
-The platform provisions a complete AWS environment capable of running multiple backend and frontend services with:
+This project was built to demonstrate:
 
-- ECS Fargate for containerized workloads
-- Application Load Balancer for traffic routing
-- Amazon RDS for persistence
-- Amazon ECR for container images
-- CloudWatch for logs
-- GitHub Actions for CI/CD
-- Terraform for Infrastructure as Code
-
-The project currently implements a **development environment**, with the folder structure intentionally designed to support additional environments (staging, production) in the future.
+- End-to-end infrastructure provisioning using Terraform
+- Running multiple services on ECS Fargate (serverless containers)
+- Secure CI/CD pipelines using GitHub Actions
+- Clear separation of infrastructure, deployment, and application concerns
+- Design decisions and trade-offs commonly made in real-world systems
 
 ---
 
-## 🏗️ Architecture Summary
+## 🧠 Project Overview
 
-At a high level:
+The platform provisions a complete AWS environment capable of running multiple services:
 
-- Each service (user, product, frontend) is built and containerized independently
-- CI pipelines build images and push them to ECR
-- ECS services pull images and run tasks in private subnets
-- An Application Load Balancer exposes services externally
-- RDS provides a managed relational database
-- IAM roles are separated for CI, ECS execution, and application runtime
+- Frontend service (React + Nginx)
+- Backend services (Spring Boot – User & Product)
+- Managed database (Amazon RDS)
+- Container registry (Amazon ECR)
+- Traffic routing (Application Load Balancer)
+- Observability (CloudWatch Logs)
+- CI/CD automation (GitHub Actions)
+- Infrastructure as Code (Terraform)
+
+The current implementation targets a development environment, with the repository structured to support future environments (staging / production).
+
+---
+
+.
+
+## 🏗️ High-Level Architecture
+### Runtime Architecture
+
+#### Request flow:
+```java
+Client
+  ↓
+Application Load Balancer
+  ↓
+ECS Fargate Services (Frontend / Backend)
+  ↓
+Amazon RDS
+```
+
+Key characteristics:
+
+- ECS tasks run in private subnets
+- Only the ALB is publicly exposed
+- Services communicate via internal networking
+- Health checks ensure traffic reaches only healthy tasks
+
+📌 (Insert architecture diagram screenshot here)
+
+---
+
+## 🔁 CI/CD Architecture
+
+Each commit to the main branch triggers a GitHub Actions workflow that:
+
+1. Builds frontend and backend services
+2. Builds Docker images per service
+3. Scans images for vulnerabilities
+4. Pushes images to Amazon ECR
+5. Deploys updated services to ECS using rolling deployments
+
+Key pipeline characteristics:
+
+- Parallel builds using matrix jobs
+- Centralized image tagging
+- Infrastructure and application pipelines are separated
+- Non-blocking quality checks (Sonar)
+
+📌 (Insert CI/CD pipeline screenshot here)
+
+## 🧪 CI/CD Pipeline Design
+
+The pipeline is intentionally structured into clear phases:
+
+- Phase 0 – Pipeline context
+- Phase 1A – Frontend build 
+- Phase 1B – Backend build & tests
+- Phase 2 – Docker build, trivy security scan, push to ECR
+- Phase 3 – ECS deployment
+- Final – Aggregated pipeline result
+
+Matrix jobs are used for homogeneous workloads to keep the pipeline scalable as services grow.
 
 ---
 
@@ -48,9 +109,12 @@ At a high level:
 │       ├── ecs.tf
 │       ├── ecr.tf
 │       ├── rds.tf
-│       ├── iam-ci.tf
 │       ├── iam-ecs.tf
-│       └── cloudwatch.tf
+│       ├── cloudwatch.tf
+|       ├── outputs.tf
+|       ├── provider.tf
+|       ├── variables.tf
+|       └── backend.tf
 │
 ├── user-svc/                  # User backend service (Spring Boot)
 ├── product-svc/               # Product backend service (Spring Boot)
@@ -60,22 +124,13 @@ At a high level:
 │   └── catalogix-cicd.yaml    # CI/CD pipeline
 ```
 
-## CI/CD Pipeline
+Terraform modules were intentionally avoided to keep the infrastructure explicit and reviewable.
 
-The GitHub Actions pipeline performs the following:
+---
 
-1. Builds application artifacts
-2. Builds Docker images
-3. Pushes images to Amazon ECR
-4. Deploys updated services to ECS
+---
 
-Key characteristics:
-
-- Matrix builds are used to handle multiple services
-- Environment variables and secrets are managed via GitHub Actions secrets
-- Infrastructure and application concerns are clearly separated
-
-## Deployment & Rollback Strategy
+## 🔄 Deployment & Rollback Strategy
 
 ### Deployment
 
@@ -89,28 +144,189 @@ Key characteristics:
 - Rollback can be performed by redeploying a previous stable revision
 - No additional tooling is required
 
-## Testing
+---
 
-Backend services include basic unit and controller tests to validate core functionality during CI.
+## 🧪 Testing
 
-Testing is intentionally kept minimal, as the focus of this project is infrastructure and deployment automation.
+- Backend services include basic unit and integration tests
+- CI fails fast on build or test errors
+- Testing scope kept minimal to emphasize infrastructure & automation
 
-## Security & IAM
+---
 
-- Separate IAM roles for:
-  - CI/CD pipeline
-  - ECS task execution
-  - Application runtime
+## 🔍 Static Code Analysis
 
-- Security groups enforce strict traffic flow:
-  - ALB → ECS → RDS
+This project integrates Sonar-based static code analysis.
+
+- SonarQube was used locally during development
+- CI pipeline steps are SonarCloud-compatible
+- Sonar analysis is non-blocking by design
+
+This avoids introducing persistent analysis infrastructure while keeping the pipeline production-ready.
+
+---
+
+## 🧩 Design Decisions & Trade-offs
+
+This project intentionally prioritizes platform engineering clarity over application complexity.
+Below are the key architectural decisions and the trade-offs behind them.
+
+### 1️⃣ ECS Fargate over EC2 / EKS
+
+**Decision**
+ECS Fargate was chosen as the container runtime instead of EC2-backed ECS or Kubernetes (EKS).
+
+**Why**
+
+- No node management or AMI lifecycle
+- Native AWS integration (ALB, IAM, CloudWatch)
+- Faster time-to-production for small teams
+
+**Trade-off**
+
+- Less control over underlying compute
+- Vendor lock-in compared to Kubernetes
+
+**Rationale**
+For a DevOps-focused platform demonstrating AWS-native design, Fargate offers the best balance between operational simplicity and production realism.
+
+### 2️⃣ Single ALB with Path-Based Routing
+
+**Decision**
+A single Application Load Balancer routes traffic to multiple services using path-based rules.
+
+**Why**
+
+- Cost-efficient
+- Centralized ingress
+- Simple to reason about request flow
+
+**Trade-off**
+
+- Shared blast radius if ALB misconfigured
+- Less isolation than per-service ALBs
+
+**Rationale**
+This reflects a common real-world pattern for early-stage or internal platforms, while remaining extensible for future isolation if required.
+
+### 3️⃣ Matrix-Based CI/CD Pipelines
+
+**Decision**
+GitHub Actions matrix jobs are used to build, scan, and deploy multiple services in parallel.
+
+**Why**
+
+- Clear per-service isolation
+- Faster pipelines through parallelism
+- Scales naturally as services are added
+
+**Trade-off**
+
+- Slightly more complex YAML
+- Aggregated job status requires careful handling
+
+**Rationale**
+This mirrors how modern CI/CD systems handle microservices without duplicating pipeline logic.
+
+### 4️⃣ Non-Blocking Security & Code Quality Scans
+
+**Decision**
+Trivy security scans and Sonar-based analysis are included but configured as non-blocking.
+
+**Why**
+
+- Avoids deployment friction during early iterations
+- Keeps focus on platform reliability
+- Makes pipeline production-ready without enforcing premature gates
+
+**Trade-off**
+
+- Vulnerabilities do not automatically block deployments
+- Requires human review or future policy enforcement
+
+**Rationale**
+This reflects real-world maturity progression: visibility first, enforcement later.
+
+### 5️⃣ Terraform without Modules (Intentionally)
+
+**Decision**
+Terraform modules were intentionally avoided.
+
+**Why**
+
+- Improves readability for reviewers
+- Makes resource relationships explicit
+- Easier to trace during interviews
+
+**Trade-off**
+
+- Less DRY
+- Harder to scale across many environments
+
+**Rationale**
+For a learning and portfolio project, transparency was prioritized over abstraction.
+
+### 6️⃣ Minimal Application Logic
+
+**Decision**
+Application services are intentionally simple.
+
+**Why**
+
+- Keeps focus on infrastructure, CI/CD, and deployment
+- Avoids conflating backend engineering with platform engineering
+
+**Trade-off**
+
+- Limited business logic depth
+
+**Rationale**
+The project’s goal is to demonstrate how services are built, shipped, and operated, not feature-rich applications.
+
+### 7️⃣ Serverless-Aligned Tooling Choices
+
+**Decision**
+Persistent tooling infrastructure (e.g., self-hosted SonarQube) was avoided.
+
+**Why**
+
+- Reduces operational overhead
+- Keeps infrastructure stateless where possible
+- Aligns with serverless principles
+
+**Trade-off**
+
+- Some tooling (e.g., SonarCloud) requires external SaaS integration
+
+**Rationale**
+The pipeline is designed to be cloud-native and cost-conscious, while remaining extensible.
+
+### 8️⃣ Observability as a First-Class Concern
+
+**Decision**
+CloudWatch logging is configured per service with defined retention.
+
+**Why**
+
+- Enables debugging and post-deployment visibility
+- Avoids silent failures
+- Mirrors production expectations
+
+**Trade-off**
+
+- No advanced tracing or metrics dashboards yet
+
+**Rationale**
+Logs are the foundational observability layer and are sufficient for this platform’s scope.
+
+---
 
 ## Future Improvements
 
-- Add staging and production environments
-- Add more CloudWatch alarms and metrics
-- Explore advanced deployment strategies (blue/green, canary)
-- Improve observability and tracing
+- Multi-environment support (staging / production)
+- CloudWatch alarms and dashboards
+- Advanced deployment strategies (blue/green, canary)
+- Distributed tracing and deeper observability
 
 Notes
 
@@ -209,3 +425,60 @@ This project integrates Sonar-based static code analysis.
 
 This approach avoids introducing persistent analysis infrastructure while
 keeping the pipeline production-ready.
+
+🎯 What diagrams you should actually draw (important)
+
+You only need two diagrams. More than that hurts.
+
+1️⃣ High-Level AWS Architecture (MOST IMPORTANT)
+
+Include:
+
+VPC
+
+Public Subnets → ALB
+
+Private Subnets → ECS (Fargate)
+
+RDS
+
+ECR
+
+CloudWatch
+
+IAM roles (simple labels)
+
+Keep it readable in 1 glance.
+
+2️⃣ CI/CD Flow Diagram
+
+Include:
+
+Developer → GitHub
+
+GitHub Actions
+
+Build/Test
+
+Docker Build
+
+ECR
+
+ECS Deploy
+
+This pairs perfectly with your pipeline screenshots.
+
+
+
+
+
+RESUME BULLETS
+Cloud-Native Infrastructure Automation & Serverless Container Deployment on AWS
+
+Designed and provisioned a cloud-native AWS platform using Terraform with ECS Fargate, ALB, ECR, RDS, and CloudWatch
+
+Built a parallelized CI/CD pipeline in GitHub Actions using matrix jobs to build, scan, containerize, and deploy multiple services
+
+Implemented secure container delivery and rolling ECS deployments, integrating image scanning and zero-downtime updates
+
+Applied production-grade IAM and networking design, enforcing least-privilege roles, private workloads, and controlled ingress

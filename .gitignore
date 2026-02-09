@@ -66,3 +66,4 @@ override.tf.json
 terraform.tfvars
 *.auto.tfvars
 *.tfvars.json
+*.tfplan
