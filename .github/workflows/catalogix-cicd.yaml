@@ -21,7 +21,7 @@ env:
 
 jobs:
   context:
-    name: Phase 0 -- Pipeline Context🧩
+    name: Phase 0 - Pipeline Context🧩
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.tag.outputs.image_tag }}
@@ -38,7 +38,7 @@ jobs:
 # PHASE 1A — FRONTEND BUILD
 
   build-frontend-svcs:
-    name: "Phase 1A -- Build Frontend🧪"
+    name: "Phase 1A - Build Frontend🧪"
     runs-on: ubuntu-22.04
     needs: context
 
@@ -67,7 +67,7 @@ jobs:
 # PHASE 1B — BACKEND BUILD & TEST
 
   build-backend-svcs:
-    name: Phase 1B -- Build & Test Backend 🧪
+    name: Phase 1B - Build & Test Backend 🧪
     runs-on: ubuntu-22.04
     needs: build-frontend-svcs
 
@@ -90,21 +90,21 @@ jobs:
       - name: Build & Test - ${{ matrix.service }}
         run: mvn -B -f ${{ matrix.service }}/pom.xml clean verify
 
-      # -------- SonarQube (non-blocking by design) --------
-      # - name: SonarQube Scan - ${{ matrix.service }}
-      #   if: always()
-      #   continue-on-error: true
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      #   run: |
-      #     mvn -f ${{ matrix.service }}/pom.xml sonar:sonar \
-      #       -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-      #       -Dsonar.login=$SONAR_TOKEN
+      # SonarQube (non-blocking by design) 
+      - name: SonarQube Scan - ${{ matrix.service }}
+        if: always()
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn -f ${{ matrix.service }}/pom.xml sonar:sonar \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.login=$SONAR_TOKEN
 
 # PHASE 2 — DOCKER OPERATIONS (BUILD, SCAN, PUSH)
 
   docker-ops:
-    name: Phase 2 -- Docker Build, Security Scan, Image Push 🐳
+    name: Phase 2 - Docker Build, Security Scan, Image Push 🐳
     runs-on: ubuntu-latest
     needs: 
       - context
@@ -152,7 +152,7 @@ jobs:
 # PHASE 3 — DEPLOY TO ECS
 
   deploy:
-    name:  Phase 3 -- Deploy to ECS 🚀
+    name:  Phase 3 - Deploy to ECS 🚀
     runs-on: ubuntu-latest
     needs: docker-ops
 
@@ -168,36 +168,27 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Download Task Definition
+      - name: Download current Task Definition
         run: |
           aws ecs describe-task-definition \
             --task-definition ${{ env.APP_NAME }}-${{ matrix.service }} \
-            --query 'taskDefinition.{containerDefinitions:containerDefinitions, family:family, taskRoleArn:taskRoleArn, executionRoleArn:executionRoleArn, networkMode:networkMode, volumes:volumes, placementConstraints:placementConstraints, requiresCompatibilities:requiresCompatibilities, cpu:cpu, memory:memory, ephemeralStorage:ephemeralStorage, runtimePlatform:runtimePlatform}' \
-            > task-definition.json
+            --query taskDefinition > task-definition.json
 
-      - name: Render new task definition
-        run: |
-          IMAGE_URI="${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }}"
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ matrix.service }} # Match your container name in ECS
+          image: ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }}
 
-          jq --arg IMAGE "$IMAGE_URI" '
-            .containerDefinitions[0].image = $IMAGE
-          ' task-definition.json > new-task-definition.json
-
-      - name: Register new task definition
-        id: register
-        run: |
-          TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file://new-task-definition.json \
-            --query "taskDefinition.taskDefinitionArn" \
-            --output text)
-          echo "task_def_arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
-
-      - name: Update ECS Service
-        run: |
-          aws ecs update-service \
-            --cluster ${{ env.APP_NAME }}-cluster \
-            --service ${{ matrix.service }} \
-            --task-definition ${{ steps.register.outputs.task_def_arn }}
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ matrix.service }}
+          cluster: ${{ env.APP_NAME }}-cluster
+          wait-for-service-stability: true
 
 # FINAL — PIPELINE RESULT
 
