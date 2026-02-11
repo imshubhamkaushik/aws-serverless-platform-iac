@@ -102,7 +102,9 @@ jobs:
           mvn -f ${{ matrix.service }}/pom.xml verify \
             org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.login=$SONAR_TOKEN
+            -Dsonar.login=$SONAR_TOKEN \
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
+            -Dsonar.projectKey=catalogix-${{ matrix.service }}
       
       # # SonarQube - Local (non-blocking by design)
       # - name: SonarQube Local Scan - ${{ matrix.service }}
