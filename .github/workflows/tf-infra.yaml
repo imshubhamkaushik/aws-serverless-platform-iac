@@ -24,7 +24,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: terraform
+        working-directory: terraform/dev
 
     steps:
       - name: Checkout code
@@ -50,8 +50,8 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan
+        run: terraform plan -out=main.tfplan
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve "main.tfplan"
