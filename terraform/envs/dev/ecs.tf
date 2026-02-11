@@ -90,7 +90,7 @@ resource "aws_ecs_task_definition" "frontend_svc" {
   container_definitions = jsonencode([
     {
       name  = "frontend-svc"
-      image = "${aws_ecr_repository.frontend_svc.repository_url}:latest"
+      image = "${aws_ecr_repository.frontend_svc.repository_url}:init"
 
       portMappings = [
         {
@@ -125,7 +125,7 @@ resource "aws_ecs_task_definition" "user_svc" {
   container_definitions = jsonencode([
     {
       name  = "user-svc"
-      image = "${aws_ecr_repository.user_svc.repository_url}:latest"
+      image = "${aws_ecr_repository.user_svc.repository_url}:init"
 
       portMappings = [
         {
@@ -180,7 +180,7 @@ resource "aws_ecs_task_definition" "product_svc" {
   container_definitions = jsonencode([
     {
       name  = "product-svc"
-      image = "${aws_ecr_repository.product_svc.repository_url}:latest"
+      image = "${aws_ecr_repository.product_svc.repository_url}:init"
 
       portMappings = [
         {

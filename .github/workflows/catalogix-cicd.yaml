@@ -9,8 +9,9 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  id-token: write
-  contents: read
+  id-token: write # Required for AWS authentication
+  contents: read # Required to check out code
+  pull-requests: write # Required for SonarCloud to post comments on PRs
 
 env:
   AWS_REGION: ap-south-1
@@ -90,21 +91,36 @@ jobs:
       - name: Build & Test - ${{ matrix.service }}
         run: mvn -B -f ${{ matrix.service }}/pom.xml clean verify
 
-      # SonarQube (non-blocking by design) 
-      - name: SonarQube Scan - ${{ matrix.service }}
+      # SonarQube - SonarCloud (non-blocking by design) 
+      - name: SonarCloud Scan - ${{ matrix.service }}
         if: always()
         continue-on-error: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mvn -f ${{ matrix.service }}/pom.xml sonar:sonar \
+          mvn -f ${{ matrix.service }}/pom.xml verify \
+            org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.login=$SONAR_TOKEN
+      
+      # # SonarQube - Local (non-blocking by design)
+      # - name: SonarQube Local Scan - ${{ matrix.service }}
+      #   if: always()
+      #   continue-on-error: true
+      #   env:  
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      #   run: |
+      #     mvn -f ${{ matrix.service }}/pom.xml verify \
+      #       org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+      #       -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+      #       -Dsonar.projectKey=your_project_key \
+      #       -Dsonar.token=$SONAR_TOKEN
 
 # PHASE 2 — DOCKER OPERATIONS (BUILD, SCAN, PUSH)
 
   docker-ops:
-    name: Phase 2 - Docker Build, Security Scan, Image Push 🐳
+    name: Phase 2 - Image Build, Security Scan, Image Push 🐳
     runs-on: ubuntu-latest
     needs: 
       - context
