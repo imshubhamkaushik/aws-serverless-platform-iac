@@ -25,6 +25,11 @@ variable "public_subnet_cidrs" {
   type        = list(string)
 }
 
+variable "private_subnet_cidrs" {
+  description = "Private subnet CIDRs"
+  type        = list(string)
+}
+
 variable "db_name" {
   description = "PostgreSQL database name"
   type        = string

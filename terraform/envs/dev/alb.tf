@@ -1,3 +1,5 @@
+# APPLICATION LOAD BALANCER SETUP
+
 # NOTE:
 # HTTP listener only.
 # HTTPS/ACM is intentionally excluded for dev scope.
@@ -23,7 +25,7 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# USER SERVICE RULE
+# USER SERVICE LISTENER RULE
 resource "aws_lb_listener_rule" "user_svc" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 10
@@ -41,7 +43,7 @@ resource "aws_lb_listener_rule" "user_svc" {
   }
 }
 
-# PRODUCT SERVICE RULE
+# PRODUCT SERVICE LISTENERRULE
 resource "aws_lb_listener_rule" "product_svc" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 20
