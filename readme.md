@@ -1,4 +1,4 @@
-# Cloud-Native Infrastructure Automation & Serverless Container Deployment on AWS
+# Cloud-Native Infrastructure Automation & Containerized Deployment on AWS
 
 This repository demonstrates the **design, provisioning, and operation of a production-style cloud platform on AWS**, using **Infrastructure as Code, container orchestration, and CI/CD automation**.
 
@@ -35,8 +35,6 @@ The current implementation targets a development environment, with the repositor
 
 ---
 
-.
-
 ## 🏗️ High-Level Architecture
 ### Runtime Architecture
 
@@ -53,8 +51,9 @@ Amazon RDS
 
 Key characteristics:
 
-- ECS tasks run in private subnets
-- Only the ALB is publicly exposed
+- ECS tasks run in public subnets (development setup without NAT Gateway)
+- ALB is publicly exposed
+- RDS runs in private subnets
 - Services communicate via internal networking
 - Health checks ensure traffic reaches only healthy tasks
 
@@ -127,6 +126,22 @@ Matrix jobs are used for homogeneous workloads to keep the pipeline scalable as 
 Terraform modules were intentionally avoided to keep the infrastructure explicit and reviewable.
 
 ---
+
+## 🚀 Infrastructure Deployment
+
+### Provision Infrastructure
+
+```bash
+cd terraform/envs/dev
+terraform init
+terraform plan
+terraform apply
+```
+
+### Required GitHub Secrets
+
+- ```AWS_ACCESS_KEY_ID```
+- ```AWS_SECRET_ACCESS_KEY```
 
 ---
 
@@ -321,16 +336,32 @@ Logs are the foundational observability layer and are sufficient for this platfo
 
 ---
 
+## 🧠 Development Environment Constraints
+
+This environment is intentionally optimized for simplicity and cost:
+
+- No NAT Gateway (ECS tasks run in public subnets)
+- HTTP only (no ACM/HTTPS)
+- No autoscaling
+- Single-environment focus (dev only)
+
+These trade-offs reduce operational cost while preserving architectural clarity.
+
+---
+
 ## Future Improvements
 
 - Multi-environment support (staging / production)
-- CloudWatch alarms and dashboards
-- Advanced deployment strategies (blue/green, canary)
-- Distributed tracing and deeper observability
+- HTTPS with ACM
+- Private ECS with NAT or VPC Endpoints
+- Autoscaling policies
+- CloudWatch alarms & dashboards
+- Blue/green or canary deployments
+- GitHub OIDC authentication (remove long-lived access keys)
 
 Notes
 
-Terraform modules were intentionally avoided to keep infrastructure readable and traceable for learning and review purposes.
+Terraform modules were intentionally avoided to keep infrastructure readable and traceable for learning and review purposes. Will introduce later.
 
 ---
 

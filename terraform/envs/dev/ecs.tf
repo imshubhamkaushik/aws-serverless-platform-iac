@@ -1,3 +1,5 @@
+# ecs.tf
+
 # ECS CLUSTER
 # ECS cluster is the logical grouping for services and tasks.
 # With Fargate, there are NO EC2 instances or node management.
@@ -130,7 +132,6 @@ resource "aws_ecs_task_definition" "user_svc" {
       portMappings = [
         {
           containerPort = 8081
-          hostPort      = 8081
           protocol      = "tcp"
         }
       ]
@@ -141,16 +142,19 @@ resource "aws_ecs_task_definition" "user_svc" {
           value = "jdbc:postgresql://${aws_db_instance.postgres.address}:5432/${var.db_name}"
         },
         {
-          name  = "SPRING_DATASOURCE_USERNAME"
-          value = var.db_username
-        },
-        {
-          name  = "SPRING_DATASOURCE_PASSWORD"
-          value = var.db_password
-        },
-        {
           name  = "ALLOWED_ORIGINS"
           value = "*"
+        }
+      ]
+
+      secrets = [
+        {
+          name      = "SPRING_DATASOURCE_USERNAME"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:username::"
+        },
+        {
+          name      = "SPRING_DATASOURCE_PASSWORD"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:password::"
         }
       ]
 
@@ -185,7 +189,6 @@ resource "aws_ecs_task_definition" "product_svc" {
       portMappings = [
         {
           containerPort = 8082
-          hostPort      = 8082
           protocol      = "tcp"
         }
       ]
@@ -196,16 +199,19 @@ resource "aws_ecs_task_definition" "product_svc" {
           value = "jdbc:postgresql://${aws_db_instance.postgres.address}:5432/${var.db_name}"
         },
         {
-          name  = "SPRING_DATASOURCE_USERNAME"
-          value = var.db_username
-        },
-        {
-          name  = "SPRING_DATASOURCE_PASSWORD"
-          value = var.db_password
-        },
-        {
           name  = "ALLOWED_ORIGINS"
           value = "*"
+        }
+      ]
+
+      secrets = [
+        {
+          name      = "SPRING_DATASOURCE_USERNAME"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:username::"
+        },
+        {
+          name      = "SPRING_DATASOURCE_PASSWORD"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:password::"
         }
       ]
 
@@ -224,9 +230,7 @@ resource "aws_ecs_task_definition" "product_svc" {
 
 # ECS SERVICES
 
-# Service ensures desired number of tasks are running
-# and integrates ECS with ALB.
-
+# Service ensures desired number of tasks are running and integrates ECS with ALB.
 
 # FRONTEND SERVICE
 
@@ -242,9 +246,9 @@ resource "aws_ecs_service" "frontend_svc" {
   }
 
   network_configuration {
-    subnets          = aws_subnet.public[*].id
+    subnets          = aws_subnet.private_ecs[*].id
     security_groups  = [aws_security_group.ecs_service.id]
-    assign_public_ip = true
+    assign_public_ip = false
   }
 
   load_balancer {
@@ -271,9 +275,9 @@ resource "aws_ecs_service" "user_svc" {
   }
 
   network_configuration {
-    subnets          = aws_subnet.public[*].id
+    subnets          = aws_subnet.private_ecs[*].id
     security_groups  = [aws_security_group.ecs_service.id]
-    assign_public_ip = true
+    assign_public_ip = false
   }
 
   load_balancer {
@@ -300,9 +304,9 @@ resource "aws_ecs_service" "product_svc" {
   }
 
   network_configuration {
-    subnets          = aws_subnet.public[*].id
+    subnets          = aws_subnet.private_ecs[*].id
     security_groups  = [aws_security_group.ecs_service.id]
-    assign_public_ip = true
+    assign_public_ip = false
   }
 
   load_balancer {
@@ -314,5 +318,3 @@ resource "aws_ecs_service" "product_svc" {
   depends_on = [aws_lb_listener.http]
 
 }
-
-

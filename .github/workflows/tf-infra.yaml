@@ -1,3 +1,6 @@
+# tf-infra.yaml
+# GitHub Actions workflow for Terraform infrastructure management
+
 name: Terraform Infrastructure
 
 on:
@@ -24,7 +27,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: terraform/dev
+        working-directory: terraform/envs/dev
 
     steps:
       - name: Checkout code
@@ -39,6 +42,8 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.0
 
       - name: Terraform Init
         run: terraform init

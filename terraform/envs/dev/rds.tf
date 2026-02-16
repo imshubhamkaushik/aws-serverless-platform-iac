@@ -1,10 +1,12 @@
+# rds.tf
+
 # RDS SUBNET GROUP
 # Tells AWS which subnets RDS is allowed to use.
 # These are PRIVATE subnets only.
 
 resource "aws_db_subnet_group" "this" {
   name       = "${var.project_name}-db-subnet-group"
-  subnet_ids = aws_subnet.private[*].id
+  subnet_ids = aws_subnet.private_rds[*].id
 }
 
 # RDS POSTGRESQL INSTANCE
