@@ -17,9 +17,9 @@ resource "aws_security_group" "alb" {
 
   # Allow ALB to talk to ECS tasks on all ports (dynamic)
   egress {
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }

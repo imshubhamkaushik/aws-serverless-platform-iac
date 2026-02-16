@@ -1,3 +1,6 @@
+# catalogix-cicd.yaml
+# GitHub Actions workflow for Catalogix CI/CD pipeline
+
 name: Catalogix CI/CD
 
 on:
