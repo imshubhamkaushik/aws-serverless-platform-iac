@@ -50,5 +50,5 @@ resource "aws_iam_role" "ecs_task" {
 
 # Fetch the existing KMS key using its alias
 data "aws_kms_alias" "tf_state_key" {
-  name = "alias/catalogix-tf-state-dev"
+  name = "alias/${var.project_name}-tf-state-dev"
 }
