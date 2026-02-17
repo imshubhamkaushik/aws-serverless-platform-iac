@@ -31,10 +31,9 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
-      Action = ["secretsmanager:GetSecretValue", "kms:Decrypt"]
+      Action = ["secretsmanager:GetSecretValue"]
       Resource = [
-        aws_secretsmanager_secret.db_credentials.arn,
-        data.aws_kms_alias.tf_state_key.target_key_arn
+        aws_secretsmanager_secret.db_credentials.arn
       ]
     }]
   })
@@ -46,9 +45,4 @@ resource "aws_iam_role" "ecs_task" {
   name = "${var.project_name}-ecs-task"
 
   assume_role_policy = aws_iam_role.ecs_execution.assume_role_policy
-}
-
-# Fetch the existing KMS key using its alias
-data "aws_kms_alias" "tf_state_key" {
-  name = "alias/${var.project_name}-tf-state-dev"
 }

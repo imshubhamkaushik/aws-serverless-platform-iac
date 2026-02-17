@@ -9,7 +9,6 @@ on:
 env:
   AWS_REGION: ap-south-1
   TF_VAR_project_name: ${{ vars.PROJECT_NAME }}
-  # ... Add all other TF_VAR_ mappings from your tf-infra.yaml here
   TF_VAR_vpc_cidr: ${{ vars.VPC_CIDR }}
   TF_VAR_public_subnet_cidrs: ${{ vars.PUBLIC_SUBNET_CIDRS }}
   TF_VAR_private_subnet_cidrs: ${{ vars.PRIVATE_SUBNET_CIDRS }}
