@@ -53,6 +53,6 @@ resource "aws_kms_key" "tf_state_key" {
 }
 
 resource "aws_kms_alias" "tf_state_alias" {
-  name          = "alias/catalogix-tf-state-dev"
+  name          = "alias/${var.project_name}-tf-state-dev"
   target_key_id = aws_kms_key.tf_state_key.id
 }
