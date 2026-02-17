@@ -38,7 +38,7 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        
+
       # Setup Environment and AWS Credentials
       - name: Setup Environment and AWS Credentials
         uses: ./.github/actions/terraform-setup
@@ -74,6 +74,9 @@ jobs:
         working-directory: terraform/envs/dev
 
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       # Setup Environment and AWS Credentials
       - name: Setup Environment and AWS Credentials
         uses: ./.github/actions/terraform-setup
@@ -103,6 +106,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       # Setup Environment and AWS Credentials
       - name: Setup Environment and AWS Credentials
         uses: ./.github/actions/terraform-setup
@@ -133,6 +139,9 @@ jobs:
     if: github.ref == 'refs/heads/main' # Only deploy on main branch
 
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
       # Setup Environment and AWS Credentials
       - name: Setup Environment and AWS Credentials
         uses: ./.github/actions/terraform-setup
