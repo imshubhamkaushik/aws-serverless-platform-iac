@@ -39,3 +39,19 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "sse" {
     }
   }
 }
+
+# KMS Key for Encryption
+resource "aws_kms_key" "tf_state_key" {
+  description             = "KMS key for encrypting Terraform state in S3"
+  deletion_window_in_days = 30
+
+  tags = {
+    Project     = "catalogix"
+    Environment = "dev"
+  }
+}
+
+resource "aws_kms_alias" "tf_state_alias" {
+  name          = "alias/catalogix-tf-state-dev"
+  target_key_id = aws_kms_key.tf_state_key.id
+}
