@@ -33,6 +33,7 @@ variable "private_subnet_cidrs" {
 variable "db_name" {
   description = "PostgreSQL database name"
   type        = string
+  default     = "catalogix"
 }
 
 variable "db_username" {
