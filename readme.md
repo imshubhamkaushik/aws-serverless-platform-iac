@@ -13,6 +13,8 @@ This project was built to demonstrate:
 - End-to-end infrastructure provisioning using Terraform
 - Running multiple services on ECS Fargate (serverless containers)
 - Secure CI/CD pipelines using GitHub Actions
+- DevSecOps practices including vulnerability and IaC scanning
+- Production-aligned networking and security design
 - Clear separation of infrastructure, deployment, and application concerns
 - Design decisions and trade-offs commonly made in real-world systems
 
@@ -22,12 +24,19 @@ This project was built to demonstrate:
 
 The platform provisions a complete AWS environment capable of running multiple services:
 
+### Services
+
 - Frontend service (React + Nginx)
 - Backend services (Spring Boot – User & Product)
-- Managed database (Amazon RDS)
+
+### Platform Components
+
+- Managed database (Amazon RDS PostgreSQL)
+- Container runtime (Amazon ECS Fargate)
 - Container registry (Amazon ECR)
 - Traffic routing (Application Load Balancer)
-- Observability (CloudWatch Logs)
+- Secure credentials (AWS Secrets Manager)
+- Observability (CloudWatch Logs and Alarms)
 - CI/CD automation (GitHub Actions)
 - Infrastructure as Code (Terraform)
 
@@ -39,25 +48,100 @@ The current implementation targets a development environment, with the repositor
 ### Runtime Architecture
 
 #### Request flow:
-```java
+```
 Client
   ↓
 Application Load Balancer
   ↓
-ECS Fargate Services (Frontend / Backend)
+ECS Fargate Services (Frontend / Backend) (Private Subnets)
   ↓
-Amazon RDS
+Amazon RDS PostgreSQL (Private subnets)
 ```
 
-Key characteristics:
+#### Key characteristics:
 
-- ECS tasks run in public subnets (development setup without NAT Gateway)
-- ALB is publicly exposed
-- RDS runs in private subnets
-- Services communicate via internal networking
-- Health checks ensure traffic reaches only healthy tasks
+- ALB runs in public subnets.
+- ECS services run in private subnets.
+- NAT Gateway provides outbound internet access.
+- RDS is isolated in private DB subnets, not publicly accessible.
+- Services communicate via internal networking.
+- Health checks ensure traffic reaches only healthy tasks.
 
 📌 (Insert architecture diagram screenshot here)
+
+---
+
+---
+
+### 🔐 Networking & Security Architecture
+
+#### Network Design
+
+- Custom VPC with CIDR planning
+- Public subnets → ALB
+- Private app subnets → ECS tasks
+- Private DB subnets → RDS
+- NAT Gateway for secure outbound traffic
+- Internet Gateway for inbound ALB traffic
+
+#### Security Controls
+
+- Least-privilege IAM roles
+- ECS accessible only via ALB
+- RDS accessible only from ECS
+- No public database exposure
+- Secrets stored in AWS Secrets Manager
+- Private workloads with controlled ingress
+
+---
+
+### ☁️ AWS Infrastructure
+
+Provisioned using Terraform.
+
+#### Compute & Containers
+
+- ECS Cluster (Fargate)
+- Service-per-microservice architecture
+- Target groups & health checks
+- Rolling deployments
+
+#### Database
+
+- Amazon RDS PostgreSQL
+- Private subnets only
+- Security group isolation
+- Credentials stored in Secrets Manager
+
+#### Observability
+
+- CloudWatch log groups per service
+- ECS CPU alarms
+- ALB health alarms
+- Metrics dashboard
+
+---
+
+### 📦 Infrastructure as Code (Terraform)
+
+Terraform provisions:
+
+- VPC & networking
+- ECS cluster & services
+- ALB & routing
+- RDS database
+- IAM roles & policies
+- ECR repositories
+- CloudWatch monitoring
+- Secrets Manager
+
+#### Terraform Pipeline Highlights
+
+- Remote state bootstrap (S3 backend)
+- Security scanning via tfsec
+- Automated plan & apply workflow
+- Environment-ready structure
+- Re-usable composite GitHub Action
 
 ---
 
@@ -78,20 +162,76 @@ Key pipeline characteristics:
 - Infrastructure and application pipelines are separated
 - Non-blocking quality checks (Sonar)
 
-📌 (Insert CI/CD pipeline screenshot here)
+Two pipelines automate platform and application delivery.
 
-## 🧪 CI/CD Pipeline Design
+---
+
+### 🏗 Terraform Infrastructure Pipeline
+
+Automates infrastructure provisioning
+
+#### Workflow
+
+1. Bootstrap remote backend (S3)
+2. Terraform format and validation
+3. Security scan (tfsec)
+4. Generate plan artifact
+5. Apply on main branch
+
+#### Key Features
+
+- Backend auto-bootstrap
+- IaC security scanning
+- Artifact-based plan/apply
+- Reusable composite GitHub Action
+
+---
+
+### 🧪 Application CI/CD Pipeline Design
 
 The pipeline is intentionally structured into clear phases:
 
 - Phase 0 – Pipeline context
-- Phase 1A – Frontend build 
-- Phase 1B – Backend build & tests
+  - Generate versioned image tag
+- Phase 1A – Frontend build (NodeJS)
+- Phase 1B – Backend build & tests (Maven)
 - Phase 2 – Docker build, trivy security scan, push to ECR
+  - Build Docker Images
+  - Trivy vulnerability scanning
+  - Push images to Amazon ECR
 - Phase 3 – ECS deployment
-- Final – Aggregated pipeline result
+  - Update ECS task definitions
+  - Deploy new revisions
+  - Wait for service stability
+- Final Summary 
+  - Aggregated pipeline result
 
 Matrix jobs are used for homogeneous workloads to keep the pipeline scalable as services grow.
+
+📌 (Insert CI/CD flow diagram here)
+
+---
+
+### 🔑 Secrets Management
+
+Database credentials are store in AWS Secrets Manager.
+
+ECS tasks retrieve credentials via IAM roles.
+
+No secrets are stored in source code or environment files.
+
+---
+
+### Monitoring and Observability
+
+CloudWatch provides
+
+- Container logs
+- ECS CPU Alarms
+- Metrics dashboards
+- ALB health alarms
+
+Logs enable rapid debugging and operational visibility.
 
 ---
 
@@ -119,8 +259,13 @@ Matrix jobs are used for homogeneous workloads to keep the pipeline scalable as 
 ├── product-svc/               # Product backend service (Spring Boot)
 ├── frontend-svc/              # Frontend service (React + Nginx)
 │
-├── .github/workflows/
-│   └── catalogix-cicd.yaml    # CI/CD pipeline
+├── .github/
+|    ├── workflows/
+|    |   ├── catalogix-cicd.yaml  # CI/CD pipeline
+|    |   └── tf-infra.yaml        # Infrastructure Pipeline
+│    └── actions/
+|        └── terraform-setup/
+|            └── action.yaml    
 ```
 
 Terraform modules were intentionally avoided to keep the infrastructure explicit and reviewable.
@@ -246,7 +391,7 @@ This mirrors how modern CI/CD systems handle microservices without duplicating p
 ### 4️⃣ Non-Blocking Security & Code Quality Scans
 
 **Decision**
-Trivy security scans and Sonar-based analysis are included but configured as non-blocking.
+Trivy security scans are included but configured as non-blocking.
 
 **Why**
 
@@ -298,25 +443,7 @@ Application services are intentionally simple.
 **Rationale**
 The project’s goal is to demonstrate how services are built, shipped, and operated, not feature-rich applications.
 
-### 7️⃣ Serverless-Aligned Tooling Choices
-
-**Decision**
-Persistent tooling infrastructure (e.g., self-hosted SonarQube) was avoided.
-
-**Why**
-
-- Reduces operational overhead
-- Keeps infrastructure stateless where possible
-- Aligns with serverless principles
-
-**Trade-off**
-
-- Some tooling (e.g., SonarCloud) requires external SaaS integration
-
-**Rationale**
-The pipeline is designed to be cloud-native and cost-conscious, while remaining extensible.
-
-### 8️⃣ Observability as a First-Class Concern
+### 7️⃣8️⃣ Observability as a First-Class Concern
 
 **Decision**
 CloudWatch logging is configured per service with defined retention.
@@ -340,10 +467,11 @@ Logs are the foundational observability layer and are sufficient for this platfo
 
 This environment is intentionally optimized for simplicity and cost:
 
-- No NAT Gateway (ECS tasks run in public subnets)
 - HTTP only (no ACM/HTTPS)
 - No autoscaling
 - Single-environment focus (dev only)
+- Simplified monitoring
+- Minimal operational overhead
 
 These trade-offs reduce operational cost while preserving architectural clarity.
 
@@ -353,15 +481,27 @@ These trade-offs reduce operational cost while preserving architectural clarity.
 
 - Multi-environment support (staging / production)
 - HTTPS with ACM
-- Private ECS with NAT or VPC Endpoints
+- AWS WAF protection
 - Autoscaling policies
-- CloudWatch alarms & dashboards
 - Blue/green or canary deployments
 - GitHub OIDC authentication (remove long-lived access keys)
+- Advanced metrics and tracing
 
 Notes
 
 Terraform modules were intentionally avoided to keep infrastructure readable and traceable for learning and review purposes. Will introduce later.
+
+---
+
+## 🎯 What This Project Demonstrates
+
+- Cloud-native architecture design
+- Infrastructure as Code best practices
+- Secure networking & IAM design
+- DevSecOps pipeline integration
+- Automated container deployments
+- Observability & operational readiness
+- Platform engineering mindset
 
 ---
 
@@ -504,7 +644,7 @@ This pairs perfectly with your pipeline screenshots.
 
 
 RESUME BULLETS
-Cloud-Native Infrastructure Automation & Serverless Container Deployment on AWS
+Cloud-Native Infrastructure Automation & Containerized Deployment on AWS
 
 Designed and provisioned a cloud-native AWS platform using Terraform with ECS Fargate, ALB, ECR, RDS, and CloudWatch
 
@@ -513,3 +653,14 @@ Built a parallelized CI/CD pipeline in GitHub Actions using matrix jobs to build
 Implemented secure container delivery and rolling ECS deployments, integrating image scanning and zero-downtime updates
 
 Applied production-grade IAM and networking design, enforcing least-privilege roles, private workloads, and controlled ingress
+
+-----
+new 18/02
+
+Designed and provisioned a cloud-native AWS platform using Terraform, deploying ECS Fargate microservices behind an Application Load Balancer with a private RDS PostgreSQL database.
+
+Built secure CI/CD pipelines in GitHub Actions to build, scan, containerize, and deploy services with immutable image versioning and zero-downtime ECS rolling deployments.
+
+Implemented production-aligned networking and security, including private subnets, NAT gateway routing, least-privilege IAM roles, and AWS Secrets Manager–based credential management.
+
+Integrated DevSecOps and observability practices by adding container vulnerability scanning (Trivy), Terraform security scanning (tfsec), and CloudWatch logging and alarms for operational visibility.
