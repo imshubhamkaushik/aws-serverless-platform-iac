@@ -30,15 +30,15 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue", "kms:Decrypt"]
+      Effect = "Allow"
+      Action = ["secretsmanager:GetSecretValue", "kms:Decrypt"]
       Resource = [
         aws_secretsmanager_secret.db_credentials.arn,
-        aws_kms_key.tf_state_key.arn # Permission to use the custom KMS key you created
+        data.aws_kms_alias.tf_state_key.target_key_arn 
       ]
     }]
   })
-  
+
 }
 
 # ECS Task Role - Role that ECS tasks assume when they run. Can be used to grant permissions to access other AWS services.
@@ -46,4 +46,9 @@ resource "aws_iam_role" "ecs_task" {
   name = "${var.project_name}-ecs-task"
 
   assume_role_policy = aws_iam_role.ecs_execution.assume_role_policy
+}
+
+# Fetch the existing KMS key using its alias
+data "aws_kms_alias" "tf_state_key" {
+  name = "alias/catalogix-tf-state-dev"
 }
