@@ -18,7 +18,7 @@ on:
 concurrency:
   group: terraform-dev
   cancel-in-progress: true
-  
+
 permissions:
   id-token: write
   contents: read
@@ -126,7 +126,7 @@ jobs:
         working-directory: terraform/envs/dev
         run: | 
           terraform init
-          terraform plan -out main.tfplan
+          terraform plan -out -input=false main.tfplan
 
       # Upload the generated plan as an artifact for the deploy job
       - name: Upload Plan Artifact
