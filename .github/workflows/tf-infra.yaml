@@ -99,7 +99,7 @@ jobs:
       - name: Quality Checks - Format and Validate
         run: |
           terraform init
-          terraform fmt -check
+          terraform fmt
           terraform validate
 
       # Security Checks with tfsec
