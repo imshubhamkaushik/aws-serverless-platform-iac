@@ -15,6 +15,10 @@ on:
     paths:
       - "terraform/**"
 
+concurrency:
+  group: terraform-dev
+  cancel-in-progress: true
+  
 permissions:
   id-token: write
   contents: read
@@ -141,7 +145,7 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        
+
       # Setup Environment and AWS Credentials
       - name: Setup Environment and AWS Credentials
         uses: ./.github/actions/terraform-setup
