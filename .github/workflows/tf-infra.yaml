@@ -36,6 +36,9 @@ jobs:
         working-directory: terraform/terraform-backend
     
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        
       # Setup Environment and AWS Credentials
       - name: Setup Environment and AWS Credentials
         uses: ./.github/actions/terraform-setup
