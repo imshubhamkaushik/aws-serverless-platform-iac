@@ -7,6 +7,8 @@ on:
   push:
     paths:
       - "terraform/**"
+      - ".github/actions/terraform-setup/**"
+      - ".github/workflows/tf-infra.yaml"
     branches:
       - main
   pull_request:
@@ -19,10 +21,49 @@ permissions:
 
 env:
   AWS_REGION: ap-south-1
+  TF_BACKEND_BUCKET: catalogix-terraform-state-dev # Change this to your desired S3 bucket name for Terraform state - Should match the bucket name in your terraform/terraform-backend/main.tf file
 
 jobs:
-  terraform:
-    name: Terraform Plan & Apply
+  # Phase 1 - Bootstrap Terraform Backend
+  bootstrap:
+    name: Check and Setup Terraform Backend
+    runs-on: ubuntu-latest
+    outputs:
+      bucket_exists: ${{ steps.check.outputs.exists}}
+    
+    defaults:
+      run:
+        working-directory: terraform/terraform-backend
+    
+    steps:
+      # Setup Environment and AWS Credentials
+      - name: Setup Environment and AWS Credentials
+        uses: ./.github/actions/terraform-setup
+        with:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      
+      # Check if S3 bucket exists
+      - name: Check if S3 bucket exists
+        id: check
+        run: |
+          if aws s3api head-bucket --bucket ${{ env.TF_BACKEND_BUCKET }} 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bootstrap Terraform Backend
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+  # Phase 2 - Code Quality Checks for Main Infra Deployment
+  prepare:
+    name: Quality and Security Checks for Terraform Code
+    needs: bootstrap
     runs-on: ubuntu-latest
 
     defaults:
@@ -30,33 +71,82 @@ jobs:
         working-directory: terraform/envs/dev
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      # Setup Environment and AWS Credentials
+      - name: Setup Environment and AWS Credentials
+        uses: ./.github/actions/terraform-setup
         with:
-          aws-region: ${{ env.AWS_REGION }}
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      # Quality Checks - Format and Validate
+      - name: Quality Checks - Format and Validate
+        run: |
+          terraform init
+          terraform fmt -check
+          terraform validate
+
+      # Security Checks with tfsec
+      - name: Terraform Security Scan (tfsec)
+        uses: aquasecurity/tfsec-action@v1.0.3
         with:
-          terraform_version: 1.14.0
+          args: --format github
+          soft_fail: false # Fail the workflow if any issues are found - Set to true if you want to allow failures and dont want to block the pipeline but still report them
 
-      - name: Terraform Init
-        run: terraform init
+  # Phase 3 - Generate Terraform Plan
+  plan:
+    name: Generate Terraform Plan
+    needs: prepare
+    runs-on: ubuntu-latest
 
-      - name: Terraform Format Check
-        run: terraform fmt -check
+    steps:
+      # Setup Environment and AWS Credentials
+      - name: Setup Environment and AWS Credentials
+        uses: ./.github/actions/terraform-setup
+        with:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      
+      # Generate Terraform Plan
+      - name: Create Terraform Plan
+        working-directory: terraform/envs/dev
+        run: | 
+          terraform init
+          terraform plan -out main.tfplan
 
-      - name: Terraform Validate
-        run: terraform validate
+      # Upload the generated plan as an artifact for the deploy job
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tf-plan
+          path: terraform/envs/dev/main.tfplan
 
-      - name: Terraform Plan
-        run: terraform plan -out=main.tfplan
+  # Phase 4 - Deploy to AWS
+  deploy:
+    name: Deploy to AWS 🌐
+    needs: plan
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' # Only deploy on main branch
 
+    steps:
+      # Setup Environment and AWS Credentials
+      - name: Setup Environment and AWS Credentials
+        uses: ./.github/actions/terraform-setup
+        with:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      
+      # Download the Terraform plan artifact created in the previous step
+      - name: Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tf-plan
+          path: terraform/envs/dev
+
+      # Apply the Terraform plan to deploy infrastructure
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve "main.tfplan"
+        working-directory: terraform/envs/dev
+        run: terraform apply --auto-approve -input=false "main.tfplan"
+        

@@ -6,6 +6,15 @@ name: Catalogix CI/CD
 on:
   push:
     branches: ["main"]
+    paths:
+      - "user-svc/**"
+      - "product-svc/**"
+      - "frontend-svc/**"
+      - ".github/workflows/catalogix-cicd.yaml"
+  workflow_run:
+    workflows: ["Terraform Infrastructure"]
+    types:
+      - completed
 
 concurrency:
   group: catalogix-main
@@ -27,6 +36,9 @@ jobs:
   context:
     name: Phase 0 - Pipeline Context🧩
     runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     outputs:
       image_tag: ${{ steps.tag.outputs.image_tag }}
 
