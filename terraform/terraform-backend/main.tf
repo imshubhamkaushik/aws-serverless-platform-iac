@@ -29,13 +29,14 @@ resource "aws_s3_bucket_versioning" "versioning" {
   }
 }
 
-# Enable server-side encryption for the bucket
+# Enable server-side encryption for using Customer Managed Key (CMK) for the bucket
 resource "aws_s3_bucket_server_side_encryption_configuration" "sse" {
   bucket = aws_s3_bucket.tf_state.id
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm = "aws:kms"
+      kms_master_key_id = aws_kms_alias.tf_state_alias.arn
     }
   }
 }
