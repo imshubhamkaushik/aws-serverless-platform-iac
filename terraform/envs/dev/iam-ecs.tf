@@ -1,5 +1,6 @@
 # iam-ecs.tf
 
+# ECS Execution Role - Allows ECS tasks to pull container images and write logs to CloudWatch.
 resource "aws_iam_role" "ecs_execution" {
   name = "${var.project_name}-ecs-execution"
 
@@ -15,26 +16,34 @@ resource "aws_iam_role" "ecs_execution" {
   })
 }
 
+# Attach the AWS-managed policy for ECS task execution to the role
 resource "aws_iam_role_policy_attachment" "ecs_execution" {
   role       = aws_iam_role.ecs_execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-resource "aws_iam_role" "ecs_task" {
-  name = "${var.project_name}-ecs-task"
-
-  assume_role_policy = aws_iam_role.ecs_execution.assume_role_policy
-}
-
-resource "aws_iam_role_policy" "ecs_secrets" {
-  role = aws_iam_role.ecs_task.name
+# Allow the Execution Role to fetch secrets from Secrets Manager
+resource "aws_iam_role_policy" "ecs_execution_secrets" {
+  name = "${var.project_name}-ecs-execution-secrets"
+  role = aws_iam_role.ecs_execution.id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue"]
-      Resource = aws_secretsmanager_secret.db_credentials.arn
+      Action   = ["secretsmanager:GetSecretValue", "kms:Decrypt"]
+      Resource = [
+        aws_secretsmanager_secret.db_credentials.arn,
+        aws_kms_key.tf_state_key.arn # Permission to use the custom KMS key you created
+      ]
     }]
   })
+  
+}
+
+# ECS Task Role - Role that ECS tasks assume when they run. Can be used to grant permissions to access other AWS services.
+resource "aws_iam_role" "ecs_task" {
+  name = "${var.project_name}-ecs-task"
+
+  assume_role_policy = aws_iam_role.ecs_execution.assume_role_policy
 }
