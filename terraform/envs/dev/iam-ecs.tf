@@ -34,7 +34,7 @@ resource "aws_iam_role_policy" "ecs_execution_secrets" {
       Action = ["secretsmanager:GetSecretValue", "kms:Decrypt"]
       Resource = [
         aws_secretsmanager_secret.db_credentials.arn,
-        data.aws_kms_alias.tf_state_key.target_key_arn 
+        data.aws_kms_alias.tf_state_key.target_key_arn
       ]
     }]
   })
