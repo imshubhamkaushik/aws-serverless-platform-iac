@@ -126,7 +126,7 @@ jobs:
         working-directory: terraform/envs/dev
         run: | 
           terraform init
-          terraform plan -out -input=false main.tfplan
+          terraform plan -input=false -out main.tfplan
 
       # Upload the generated plan as an artifact for the deploy job
       - name: Upload Plan Artifact
