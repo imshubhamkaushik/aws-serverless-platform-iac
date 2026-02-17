@@ -134,12 +134,14 @@ jobs:
           terraform init
           terraform plan -input=false -out main.tfplan
 
-      # Upload the generated plan as an artifact for the deploy job
+      # Upload the generated plan and the lock file as an artifact for the deploy job to ensure consistency
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
         with:
           name: tf-plan
-          path: terraform/envs/dev/main.tfplan
+          path: |
+            terraform/envs/dev/main.tfplan
+            terraform/envs/dev/.terraform.lock.hcl # Uploading lock file to ensure consistent provider versions during apply
 
   # Phase 4 - Deploy to AWS
   deploy:
@@ -170,5 +172,7 @@ jobs:
       # Apply the Terraform plan to deploy infrastructure
       - name: Terraform Apply
         working-directory: terraform/envs/dev
-        run: terraform apply --auto-approve -input=false "main.tfplan"
+        run: |
+          terraform init -input=false
+          terraform apply --auto-approve -input=false "main.tfplan"
         
