@@ -25,7 +25,7 @@ resource "aws_iam_role_policy_attachment" "ecs_execution" {
 # Allow the Execution Role to fetch secrets from Secrets Manager
 resource "aws_iam_role_policy" "ecs_execution_secrets" {
   name = "${var.project_name}-ecs-execution-secrets"
-  role = aws_iam_role.ecs_execution.id
+  role = aws_iam_role.ecs_execution.name
 
   policy = jsonencode({
     Version = "2012-10-17"

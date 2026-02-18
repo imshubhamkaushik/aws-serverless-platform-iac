@@ -19,12 +19,18 @@ variable "db_password" {
   sensitive   = true
 }
 
-variable "private_subnet_ids" {
-  description = "List of subnet IDs for the RDS instance"
-  type        = list(string)
+variable "private_rds" {
+  description = "List of private subnet IDs for RDS"
+  type        = list(string)  
 }
 
 variable "rds_sg_id" {
   description = "Security group ID for the RDS instance"
   type        = string
+}
+
+variable "db_port" {
+  description = "Port on which the database listens"
+  type        = number
+  default     = 5432  
 }

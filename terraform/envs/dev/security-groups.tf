@@ -4,8 +4,9 @@
 
 # ALB security group
 resource "aws_security_group" "alb" {
-  name   = "${var.project_name}-alb-sg"
-  vpc_id = aws_vpc.this.id
+  name        = "${var.project_name}-alb-sg"
+  description = "Security group for Application Load Balancer"
+  vpc_id      = aws_vpc.this.id
 
   # ALB needs to allow inbound HTTP traffic from anywhere
   ingress {
@@ -26,8 +27,9 @@ resource "aws_security_group" "alb" {
 
 # Security group for ECS tasks
 resource "aws_security_group" "ecs_service" {
-  name   = "${var.project_name}-ecs-sg"
-  vpc_id = aws_vpc.this.id
+  name        = "${var.project_name}-ecs-sg"
+  description = "Security group for ECS services"
+  vpc_id      = aws_vpc.this.id
 
   # ECS tasks need to allow inbound traffic from the ALB on all ports (dynamic)
   ingress {

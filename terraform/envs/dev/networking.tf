@@ -31,10 +31,11 @@ resource "aws_subnet" "public" {
 
 # Private subnets for ECS tasks
 resource "aws_subnet" "private_ecs" {
-  count             = length(var.private_subnet_cidrs)
-  vpc_id            = aws_vpc.this.id
-  cidr_block        = cidrsubnet(var.vpc_cidr, 4, count.index + 4)
-  availability_zone = data.aws_availability_zones.available.names[count.index]
+  count                   = length(var.private_subnet_cidrs)
+  vpc_id                  = aws_vpc.this.id
+  cidr_block              = cidrsubnet(var.vpc_cidr, 4, count.index + 4)
+  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  map_public_ip_on_launch = true
 
   tags = {
     Name = "${var.project_name}-private-ecs-${count.index}"

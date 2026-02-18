@@ -20,23 +20,45 @@ resource "aws_ecs_task_definition" "this" {
 
       portMappings = [{
         containerPort = var.container_port
+        protocol      = "tcp"
       }]
+
+      environment = [
+        {
+          name = "SPRING_DATASOURCE_URL"
+          value = var.db_url
+        },
+        {
+          name = "ALLOWED_ORIGIN"
+          value = "*"
+        }
+      ]
+
+      secrets = [
+        {
+          name      = "SPRING_DATASOURCE_USERNAME"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:username::"
+        },
+        {
+          name      = "SPRING_DATASOURCE_PASSWORD"
+          valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:password::"
+        }
+      ]
 
       logConfiguration = {
         logDriver = "awslogs"
         options = {
           awslogs-group         = var.log_group_name
           awslogs-region        = var.aws_region
-          awslogs-stream-prefix = var.service_name
+          awslogs-stream-prefix = var.service_name_prefix
         }
       }
     }
   ])
 }
 
-# # ECS SERVICES
-# # Service ensures desired number of tasks are running
-# # and integrates ECS with ALB.
+# ECS SERVICES
+# Service ensures desired number of tasks are running and integrates ECS with ALB.
 
 resource "aws_ecs_service" "this" {
   name            = var.service_name
@@ -46,7 +68,7 @@ resource "aws_ecs_service" "this" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = var.private_subnet_ids
+    subnets         = var.private_ecs
     security_groups = [var.ecs_sg_id]
     assign_public_ip = true
   }

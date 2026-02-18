@@ -1,10 +1,12 @@
+# rds/main.tf
+
 # RDS SUBNET GROUP
 # Tells AWS which subnets RDS is allowed to use.
 # These are PRIVATE subnets only.
 
 resource "aws_db_subnet_group" "this" {
   name       = "${var.project_name}-db-subnet-group"
-  subnet_ids = var.private_subnet_ids
+  subnet_ids =  var.private_rds[*].id
 }
 
 # RDS POSTGRESQL INSTANCE
@@ -31,7 +33,7 @@ resource "aws_db_instance" "postgres" {
   skip_final_snapshot = true
   deletion_protection = false
 
-  backup_retention_period = 7
+  backup_retention_period = 0
 
   lifecycle {
     create_before_destroy = true

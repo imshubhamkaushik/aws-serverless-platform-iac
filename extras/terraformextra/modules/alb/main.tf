@@ -3,7 +3,7 @@
 # NOTE:
 # HTTP listener only.
 # HTTPS/ACM is intentionally excluded for dev scope.
-# In production, ACM + HTTPS listener would be added.
+# ACM + HTTPS listener would be added later as future improvement.
 
 # APPLICATION LOAD BALANCER
 resource "aws_lb" "this" {

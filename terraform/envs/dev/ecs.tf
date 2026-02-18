@@ -8,71 +8,6 @@ resource "aws_ecs_cluster" "this" {
   name = "${var.project_name}-cluster"
 }
 
-# ALB TARGET GROUPS
-# Each ECS service needs its own target group.
-# Target type MUST be "ip" for Fargate.
-
-resource "aws_lb_target_group" "frontend_svc" {
-  name        = "${var.project_name}-frontend-svc-tg"
-  port        = 80
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.this.id
-  target_type = "ip"
-
-  health_check {
-    path                = "/"
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    timeout             = 5
-    interval            = 30
-    matcher             = "200-399"
-  }
-}
-
-resource "aws_lb_target_group" "user_svc" {
-  name        = "${var.project_name}-user-svc-tg"
-  port        = 8081
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.this.id
-  target_type = "ip"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-  health_check {
-    path                = "/health"
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    timeout             = 5
-    interval            = 30
-    matcher             = "200"
-    port                = "8081"
-  }
-}
-
-resource "aws_lb_target_group" "product_svc" {
-  name        = "${var.project_name}-product-svc-tg"
-  port        = 8082
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.this.id
-  target_type = "ip"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-  health_check {
-    path                = "/health"
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    timeout             = 5
-    interval            = 30
-    matcher             = "200"
-    port                = "8082"
-  }
-}
-
 # ECS TASK DEFINITIONS
 # Task Definition = blueprint for running containers.
 # Execution role = ECS agent permissions (pull image, push logs)
@@ -107,6 +42,8 @@ resource "aws_ecs_task_definition" "frontend_svc" {
           awslogs-group         = aws_cloudwatch_log_group.frontend_svc.name
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
+          mode                  = "non-blocking"
+          max-buffer-size        = "25m"
         }
       }
     }
@@ -164,6 +101,8 @@ resource "aws_ecs_task_definition" "user_svc" {
           awslogs-group         = aws_cloudwatch_log_group.user_svc.name
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
+          mode                  = "non-blocking"
+          max-buffer-size        = "25m"
         }
       }
     }
@@ -221,6 +160,8 @@ resource "aws_ecs_task_definition" "product_svc" {
           awslogs-group         = aws_cloudwatch_log_group.product_svc.name
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
+          mode                  = "non-blocking"
+          max-buffer-size        = "25m"
         }
       }
     }

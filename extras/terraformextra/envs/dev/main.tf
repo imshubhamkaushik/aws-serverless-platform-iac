@@ -34,6 +34,9 @@ module "ecs_cluster" {
 
 module "cloudwatch" {
   source        = "../../modules/cloudwatch"
+
+  project_name  = var.project_name
+  cluster_name  = module.ecs_cluster.cluster_name
   service_names = ["frontend-svc", "user-svc", "product-svc"]
 }
 
@@ -51,7 +54,7 @@ module "rds" {
   source = "../../modules/rds"
 
   project_name       = var.project_name
-  private_subnet_ids = module.vpc.private_subnet_ids
+  private_rds = module.vpc.private_rds
   rds_sg_id = module.security_groups.rds_sg_id
   db_name            = var.db_name
   db_username        = var.db_username
@@ -64,7 +67,8 @@ module "frontend_service" {
   project_name      = var.project_name
   service_name      = "frontend-svc"
   cluster_id        = module.ecs_cluster.cluster_id
-  private_subnet_ids        = module.vpc.private_subnet_ids
+  db_url = "jdbc:postgresql://${aws_db_instance.postgres.address}:5432/${var.db_name}"
+  private_ecs        = module.vpc.private_ecs
   ecs_sg_id = module.security_groups.ecs_sg_id
   image             = var.frontend_image
   container_port    = 80
@@ -82,7 +86,8 @@ module "user_service" {
   project_name      = var.project_name
   service_name      = "user-svc"
   cluster_id        = module.ecs_cluster.cluster_id
-  private_subnet_ids        = module.vpc.private_subnet_ids
+  db_url = "jdbc:postgresql://${aws_db_instance.postgres.address}:5432/${var.db_name}"
+  private_ecs        = module.vpc.private_ecs
   ecs_sg_id = module.security_groups.ecs_sg_id
   image             = var.user_image
   container_port    = 8081
@@ -100,7 +105,8 @@ module "product_service" {
   project_name      = var.project_name
   service_name      = "product-svc"
   cluster_id        = module.ecs_cluster.cluster_id
-  private_subnet_ids        = module.vpc.private_subnet_ids
+  db_url = "jdbc:postgresql://${aws_db_instance.postgres.address}:${module.rds.db_port}/${var.db_name}"
+  private_ecs       = module.vpc.private_ecs
   ecs_sg_id = module.security_groups.ecs_sg_id
   image             = var.product_image
   container_port    = 8082

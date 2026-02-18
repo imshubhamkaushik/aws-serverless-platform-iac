@@ -19,7 +19,7 @@ variable "cluster_id" {
     description = "ID of the ECS cluster"
 }
 
-variable "private_subnet_ids" { 
+variable "private_ecs" { 
   type = list(string) 
   description = "List of private subnet IDs for the ECS service"
 }
@@ -56,4 +56,16 @@ variable "task_role_arn" {
 variable "log_group_name" {
   type        = string
   description = "CloudWatch log group name for the ECS service"
+}
+
+variable "db_url" {
+  type        = string
+  description = "Database connection URL for the ECS service"
+  default = "jdbc:postgresql://${aws_db_instance.postgres.address}:5432/${var.db_name}"
+}
+
+variable "service_name_prefix" {
+  type        = string
+  description = "Prefix for CloudWatch log stream names"
+  default     = "ecs"
 }
