@@ -136,7 +136,7 @@ jobs:
 
       - name: Build Docker image - ${{ matrix.service }}
         run: |
-          docker build \
+          docker build --pull \
             -t ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }} \
             ./${{ matrix.service }}
       
