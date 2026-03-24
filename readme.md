@@ -67,9 +67,34 @@ Amazon RDS PostgreSQL (Private subnets)
 - Services communicate via internal networking.
 - Health checks ensure traffic reaches only healthy tasks.
 
-📌 (Insert architecture diagram screenshot here)
+### 🗺️ Architecture Diagrams (what to draw + explanation)
 
----
+#### 🗺️ Diagram: High-Level AWS Architecture
+
+::contentReference[oaicite:0]{index=0}
+
+##### Components to include:
+
+- VPC
+- Public Subnets → ALB
+- Private Subnets → ECS Tasks
+- RDS in private subnets
+- ECR
+- CloudWatch
+- Secrets Manager
+
+##### Explanation (AWS Architecture)
+
+- Client traffic enters through an Application Load Balancer.  
+- The ALB routes requests to ECS services running on Fargate in private subnets via NAT Gateway for outbound access.
+- Services pull container images from ECR via NAT Gateway and store data in RDS.  
+- Logs are shipped to CloudWatch.
+
+##### Explanation (CI/CD Pipeline)
+
+- Each commit triggers a GitHub Actions workflow.  
+- The pipeline builds Docker images, pushes them to ECR, and updates ECS services using new task definitions.
+- IAM user is used for authentication.
 
 ---
 
@@ -185,6 +210,8 @@ Automates infrastructure provisioning
 - Artifact-based plan/apply
 - Reusable composite GitHub Action
 
+Insert Pipeline Screenshot Here
+
 ---
 
 ### 🧪 Application CI/CD Pipeline Design
@@ -214,7 +241,7 @@ Matrix jobs are used for homogeneous workloads to keep the pipeline scalable as 
 
 ### 🔑 Secrets Management
 
-Database credentials are store in AWS Secrets Manager.
+Database credentials are stored in AWS Secrets Manager.
 
 ECS tasks retrieve credentials via IAM roles.
 
@@ -253,7 +280,8 @@ Logs enable rapid debugging and operational visibility.
 |       ├── outputs.tf
 |       ├── provider.tf
 |       ├── variables.tf
-|       └── backend.tf
+|       ├── backend.tf
+|       └── secrets.tf
 │
 ├── user-svc/                  # User backend service (Spring Boot)
 ├── product-svc/               # Product backend service (Spring Boot)
@@ -311,18 +339,6 @@ terraform apply
 - Backend services include basic unit and integration tests
 - CI fails fast on build or test errors
 - Testing scope kept minimal to emphasize infrastructure & automation
-
----
-
-## 🔍 Static Code Analysis
-
-This project integrates Sonar-based static code analysis.
-
-- SonarQube was used locally during development
-- CI pipeline steps are SonarCloud-compatible
-- Sonar analysis is non-blocking by design
-
-This avoids introducing persistent analysis infrastructure while keeping the pipeline production-ready.
 
 ---
 
@@ -443,7 +459,7 @@ Application services are intentionally simple.
 **Rationale**
 The project’s goal is to demonstrate how services are built, shipped, and operated, not feature-rich applications.
 
-### 7️⃣8️⃣ Observability as a First-Class Concern
+### 7️⃣ Observability as a First-Class Concern
 
 **Decision**
 CloudWatch logging is configured per service with defined retention.
@@ -505,139 +521,14 @@ Terraform modules were intentionally avoided to keep infrastructure readable and
 
 ---
 
-# 3️⃣ Architecture Diagrams (what to draw + explanation)
 
-You should have **two diagrams**.
 
----
 
-## 🗺️ Diagram 1: High-Level AWS Architecture
 
-::contentReference[oaicite:0]{index=0}
 
-### Components to include:
 
-- VPC
-- Public Subnets → ALB
-- Private Subnets → ECS Tasks
-- RDS in private subnets
-- ECR
-- CloudWatch
 
-### Explanation (use this in README / interviews):
 
-> “Client traffic enters through an Application Load Balancer.  
-> The ALB routes requests to ECS services running on Fargate in private subnets.  
-> Services pull container images from ECR and store data in RDS.  
-> Logs are shipped to CloudWatch.”
-
----
-
-## 🔁 Diagram 2: CI/CD Flow
-
-::contentReference[oaicite:1]{index=1}
-
-### Components:
-
-- Developer
-- GitHub Repo
-- GitHub Actions
-- ECR
-- ECS
-
-### Explanation:
-
-> “Each commit triggers a GitHub Actions workflow.  
-> The pipeline builds Docker images, pushes them to ECR, and updates ECS services using new task definitions.”
-
----
-
-<!-- # 4️⃣ Final Level Assessment (precise)
-
-This project is **not beginner**. -->
-
-<!-- ### Where it lies:
-
-**👉 Intermediate (DevOps / Cloud Engineering)**
-
-More specifically:
-- **Beginner–Intermediate** ❌ too low
-- **Intermediate** ✅ accurate
-- **Intermediate–High** ⚠️ only after:
-  - multi-env
-  - alarms
-  - deployment strategies
-
-For someone with **0 YOE**, this project is **above expectation**.
-
---- -->
-
-<!-- ## Final honest take
-
-You did **infrastructure engineering**, not demo scripting.
-
-Your only missing piece was **storytelling** — and now you have it.
-
-If you want next:
-- interview explanations
-- resume bullet points
-- “how to defend design choices”
-
-Just say the word. -->
-
-### Static Code Analysis
-
-This project integrates Sonar-based static code analysis.
-
-- SonarQube was used locally during development for code quality validation.
-- CI pipeline steps are SonarCloud-compatible and can be enabled by providing
-  SonarCloud credentials and organization details.
-- Sonar analysis is configured as non-blocking to prioritize deployment flow.
-
-This approach avoids introducing persistent analysis infrastructure while
-keeping the pipeline production-ready.
-
-🎯 What diagrams you should actually draw (important)
-
-You only need two diagrams. More than that hurts.
-
-1️⃣ High-Level AWS Architecture (MOST IMPORTANT)
-
-Include:
-
-VPC
-
-Public Subnets → ALB
-
-Private Subnets → ECS (Fargate)
-
-RDS
-
-ECR
-
-CloudWatch
-
-IAM roles (simple labels)
-
-Keep it readable in 1 glance.
-
-2️⃣ CI/CD Flow Diagram
-
-Include:
-
-Developer → GitHub
-
-GitHub Actions
-
-Build/Test
-
-Docker Build
-
-ECR
-
-ECS Deploy
-
-This pairs perfectly with your pipeline screenshots.
 
 
 
@@ -664,3 +555,14 @@ Built secure CI/CD pipelines in GitHub Actions to build, scan, containerize, and
 Implemented production-aligned networking and security, including private subnets, NAT gateway routing, least-privilege IAM roles, and AWS Secrets Manager–based credential management.
 
 Integrated DevSecOps and observability practices by adding container vulnerability scanning (Trivy), Terraform security scanning (tfsec), and CloudWatch logging and alarms for operational visibility.
+
+-----
+updated 
+
+✅ Designed and provisioned AWS infrastructure using Terraform (Infrastructure as Code), implementing VPC networking, ECS Fargate services, Application Load Balancer routing, RDS PostgreSQL, and IAM least-privilege access.
+
+✅ Built and automated a CI/CD pipeline with GitHub Actions to build, test, scan (Trivy, tfsec), containerize (Docker), and deploy microservices to Amazon ECS with rolling deployments.
+
+✅ Implemented secure cloud networking and secrets management, deploying services in private subnets, enabling NAT-based outbound access, restricting database connectivity, and managing credentials via AWS Secrets Manager.
+
+✅ Enabled monitoring and observability using Amazon CloudWatch logs, metrics dashboards, and alarms to track ECS performance, ALB health, and service reliability.

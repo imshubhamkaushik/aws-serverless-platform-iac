@@ -170,7 +170,6 @@ resource "aws_ecs_task_definition" "product_svc" {
 
 
 # ECS SERVICES
-
 # Service ensures desired number of tasks are running and integrates ECS with ALB.
 
 # FRONTEND SERVICE
@@ -183,7 +182,7 @@ resource "aws_ecs_service" "frontend_svc" {
   launch_type     = "FARGATE"
 
   lifecycle {
-    ignore_changes = [task_definition]
+    ignore_changes = [task_definition, desired_count]
   }
 
   network_configuration {
@@ -212,7 +211,7 @@ resource "aws_ecs_service" "user_svc" {
   health_check_grace_period_seconds = 90
 
   lifecycle {
-    ignore_changes = [task_definition]
+    ignore_changes = [task_definition, desired_count]
   }
 
   network_configuration {
@@ -241,7 +240,7 @@ resource "aws_ecs_service" "product_svc" {
   health_check_grace_period_seconds = 90
 
   lifecycle {
-    ignore_changes = [task_definition]
+    ignore_changes = [task_definition, desired_count]
   }
 
   network_configuration {

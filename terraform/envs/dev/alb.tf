@@ -2,7 +2,6 @@
 
 # APPLICATION LOAD BALANCER SETUP
 
-# NOTE:
 # HTTP listener only.
 # HTTPS/ACM is intentionally excluded for dev scope.
 # ACM + HTTPS listener would be added later as future improvement.
