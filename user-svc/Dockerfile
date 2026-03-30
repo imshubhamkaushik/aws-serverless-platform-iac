@@ -9,7 +9,7 @@ RUN mvn -B -N install
 
 # Now copy and build the service
 COPY user-svc/pom.xml user-svc/pom.xml
-COPY user-svc/src     user-svc/src
+COPY user-svc/src user-svc/src
 RUN mvn -B clean package -DskipTests -f user-svc/pom.xml
 
 # ---------- Runtime Stage ----------
@@ -17,7 +17,7 @@ FROM gcr.io/distroless/java21-debian13:nonroot
 WORKDIR /app
 
 # Copy only the JAR from build stage
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build /app/user-svc/target/*.jar app.jar
 EXPOSE 8081
 
 # Run the JAR
