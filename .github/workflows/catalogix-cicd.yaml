@@ -101,7 +101,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
           cache: maven
 
       - name: Build & Test - ${{ matrix.service }}
@@ -115,6 +115,7 @@ jobs:
     needs: 
       - context
       - build-backend-svcs
+      - build-frontend-svcs
       
     strategy:
       matrix:
@@ -140,7 +141,7 @@ jobs:
           docker build --pull \
             --cache-from ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:cache \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            -t ... \
+            -t ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }} \
             ./${{ matrix.service }}
       
       - name: Trivy Security Scan - ${{ matrix.service }}
