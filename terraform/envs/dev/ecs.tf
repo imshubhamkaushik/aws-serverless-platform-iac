@@ -6,6 +6,10 @@
 
 resource "aws_ecs_cluster" "this" {
   name = "${var.project_name}-cluster"
+  setting {
+    name = "containerInsights"
+    value = "enabled"
+  }
 }
 
 # ECS TASK DEFINITIONS
@@ -43,7 +47,7 @@ resource "aws_ecs_task_definition" "frontend_svc" {
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
           mode                  = "non-blocking"
-          max-buffer-size        = "25m"
+          max-buffer-size       = "25m"
         }
       }
     }
@@ -102,7 +106,7 @@ resource "aws_ecs_task_definition" "user_svc" {
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
           mode                  = "non-blocking"
-          max-buffer-size        = "25m"
+          max-buffer-size       = "25m"
         }
       }
     }
@@ -161,7 +165,7 @@ resource "aws_ecs_task_definition" "product_svc" {
           awslogs-region        = var.aws_region
           awslogs-stream-prefix = "ecs"
           mode                  = "non-blocking"
-          max-buffer-size        = "25m"
+          max-buffer-size       = "25m"
         }
       }
     }

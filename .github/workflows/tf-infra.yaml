@@ -97,10 +97,11 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       # Quality Checks - Format and Validate
+      # terraform fmt -check -recursive --> This fails the pipeline if any file is not properly formatted, forcing the developer to run terraform fmt locally before committing.
       - name: Quality Checks - Format and Validate
         run: |
           terraform init
-          terraform fmt
+          terraform fmt -check -recursive
           terraform validate
 
       # Security Checks with tfsec

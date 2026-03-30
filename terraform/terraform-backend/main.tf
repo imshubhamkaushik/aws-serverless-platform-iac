@@ -2,7 +2,7 @@
 
 # This Terraform configuration sets up the S3 bucket and DynamoDB table for Terraform state management.
 resource "aws_s3_bucket" "tf_state" {
-  bucket = "catalogix-terraform-state-dev"
+  bucket        = "catalogix-terraform-state-dev"
   force_destroy = false # Protects against accidental deletion of the bucket and its contents
 
   tags = {
@@ -35,7 +35,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "sse" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "aws:kms"
+      sse_algorithm     = "aws:kms"
       kms_master_key_id = aws_kms_alias.tf_state_alias.arn
     }
   }

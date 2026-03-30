@@ -209,13 +209,13 @@ resource "aws_cloudwatch_dashboard" "this" {
 locals {
   ecs_services = {
     frontend = aws_ecs_service.frontend_svc.name,
-    user = aws_ecs_service.user_svc.name,
-    product = aws_ecs_service.product_svc.name,
+    user     = aws_ecs_service.user_svc.name,
+    product  = aws_ecs_service.product_svc.name,
   }
 
   target_groups = {
     frontend = aws_lb_target_group.frontend_svc.arn_suffix,
-    user = aws_lb_target_group.user_svc.arn_suffix,
-    product = aws_lb_target_group.product_svc.arn_suffix
+    user     = aws_lb_target_group.user_svc.arn_suffix,
+    product  = aws_lb_target_group.product_svc.arn_suffix
   }
 }
