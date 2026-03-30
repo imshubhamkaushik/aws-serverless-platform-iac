@@ -105,7 +105,9 @@ jobs:
           cache: maven
 
       - name: Build & Test - ${{ matrix.service }}
-        run: mvn -B -f ${{ matrix.service }}/pom.xml clean verify
+        run: |
+          mvn -B install -N --file pom.xml 
+          mvn -B -f ${{ matrix.service }}/pom.xml clean verify
 
 # PHASE 2 — DOCKER OPERATIONS (BUILD, SCAN, PUSH)
 
