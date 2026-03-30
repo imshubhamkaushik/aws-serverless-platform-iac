@@ -140,11 +140,21 @@ jobs:
 
       - name: Build Docker image - ${{ matrix.service }}
         run: |
+          # Backend services need root context (Dockerfiles reference parent pom + service subdirs)
+          # Frontend uses its own dir as context
+          if [[ "${{ matrix.service }}" == "frontend-svc" ]]; then
+            CONTEXT="./${{ matrix.service }}"
+            DOCKERFILE="./${{ matrix.service }}/Dockerfile"
+          else
+            CONTEXT="."
+            DOCKERFILE="./${{ matrix.service }}/Dockerfile"
+          fi
+
           docker build --pull \
             --cache-from ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:cache \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
             -t ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }} \
-            -f ./${{ matrix.service }}/Dockerfile \
+            -f $DOCKERFILE \
             .
       
       - name: Trivy Security Scan - ${{ matrix.service }}
