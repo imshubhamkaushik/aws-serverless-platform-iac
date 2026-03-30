@@ -155,7 +155,7 @@ jobs:
             --build-arg BUILDKIT_INLINE_CACHE=1 \
             -t ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }} \
             -f $DOCKERFILE \
-            .
+            $CONTEXT
       
       - name: Trivy Security Scan - ${{ matrix.service }}
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
