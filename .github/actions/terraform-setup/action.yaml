@@ -23,10 +23,10 @@ runs:
   using: "composite"
   steps:
     - name: Checkout Code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
+      uses: aws-actions/configure-aws-credentials@v5.1.0
       with:
         aws-region: ${{ inputs.AWS_REGION }}
         aws-access-key-id: ${{ inputs.AWS_ACCESS_KEY_ID }}
@@ -34,6 +34,6 @@ runs:
     
     - name: Setup Terraform
       if: ${{ inputs.enable_terraform == 'true' }} # Only runs if enable_terraform is true
-      uses: hashicorp/setup-terraform@v3
+      uses: hashicorp/setup-terraform@v3.1.2
       with:
         terraform_version: 1.14.0
