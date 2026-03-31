@@ -160,7 +160,7 @@ jobs:
             $CONTEXT
       
       - name: Trivy Security Scan - ${{ matrix.service }}
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@0
         with:
           image-ref: ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }}
           severity: CRITICAL,HIGH
