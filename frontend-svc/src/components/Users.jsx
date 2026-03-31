@@ -33,6 +33,11 @@ function Toast({ message, onDone }) {
   );
 }
 
+Toast.propTypes = {
+  message: PropTypes.string.isRequired,
+  onDone: PropTypes.func.isRequired,
+};
+
 export default function Users({ currentUser, onUserSelected }) {
   const [users, setUsers]       = useState([]);
   const [loading, setLoading]   = useState(false);
@@ -82,7 +87,7 @@ export default function Users({ currentUser, onUserSelected }) {
 
   const handleDelete = async (user) => {
     // Inline confirmation instead of browser confirm()
-    if (!window.confirm(`Remove ${user.name}? This cannot be undone.`)) return;
+    if (!globalThis.confirm(`Remove ${user.name}? This cannot be undone.`)) return;
     try {
       await deleteUser(user.id);
       if (currentUser?.id === user.id) onUserSelected(null);
@@ -114,7 +119,6 @@ export default function Users({ currentUser, onUserSelected }) {
       </div>
 
       <div className="page-content">
-
         {toast && <Toast message={toast} onDone={() => setToast("")} />}
         {error && <div className="toast toast-error">{error}</div>}
 
@@ -123,7 +127,7 @@ export default function Users({ currentUser, onUserSelected }) {
           <p className="form-panel-label">Register new user</p>
           <form className="form-fields form-fields-4" onSubmit={handleRegister}>
             <div className="field-wrap">
-              <label className="field-label">Full name</label>
+              <label className="field-label" htmlFor="reg-name">Full name</label>
               <input
                 className="field-input"
                 placeholder="e.g. Priya Patel"
@@ -134,7 +138,7 @@ export default function Users({ currentUser, onUserSelected }) {
               />
             </div>
             <div className="field-wrap">
-              <label className="field-label">Email address</label>
+              <label className="field-label" htmlFor="reg-email">Email address</label>
               <input
                 className="field-input"
                 type="email"
@@ -146,7 +150,7 @@ export default function Users({ currentUser, onUserSelected }) {
               />
             </div>
             <div className="field-wrap">
-              <label className="field-label">Password</label>
+              <label className="field-label" htmlFor="reg-password">Password</label>
               <input
                 className="field-input"
                 type="password"
@@ -173,8 +177,14 @@ export default function Users({ currentUser, onUserSelected }) {
             )}
           </div>
           <div className="search-box">
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" style={{ opacity: 0.4, flexShrink: 0 }}>
-              <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398l3.85 3.85a1 1 0 001.415-1.414l-3.868-3.834zm-5.242 1.156a5 5 0 110-10 5 5 0 010 10z"/>
+            <svg
+              viewBox="0 0 16 16"
+              width="13"
+              height="13"
+              fill="currentColor"
+              style={{ opacity: 0.4, flexShrink: 0 }}
+            >
+              <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398l3.85 3.85a1 1 0 001.415-1.414l-3.868-3.834zm-5.242 1.156a5 5 0 110-10 5 5 0 010 10z" />
             </svg>
             <input
               placeholder="Search users…"
@@ -197,15 +207,22 @@ export default function Users({ currentUser, onUserSelected }) {
         {!loading && filtered.length === 0 && (
           <div className="empty-state">
             <div className="empty-icon">
-              <svg viewBox="0 0 16 16" width="20" height="20" fill="currentColor">
-                <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6a5 5 0 0110 0H3z"/>
+              <svg
+                viewBox="0 0 16 16"
+                width="20"
+                height="20"
+                fill="currentColor"
+              >
+                <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6a5 5 0 0110 0H3z" />
               </svg>
             </div>
             <p className="empty-title">
               {search ? "No users match your search" : "No users yet"}
             </p>
             <p className="empty-sub">
-              {search ? "Try a different name or email." : "Register the first user using the form above."}
+              {search
+                ? "Try a different name or email."
+                : "Register the first user using the form above."}
             </p>
           </div>
         )}
@@ -216,7 +233,10 @@ export default function Users({ currentUser, onUserSelected }) {
             {filtered.map((user) => {
               const isActive = currentUser?.id === user.id;
               return (
-                <div key={user.id} className={`item-row${isActive ? " item-row-active" : ""}`}>
+                <div
+                  key={user.id}
+                  className={`item-row${isActive ? " item-row-active" : ""}`}
+                >
                   <div className={`avatar ${avatarClass(user.id)}`}>
                     {initials(user.name)}
                   </div>
@@ -236,8 +256,13 @@ export default function Users({ currentUser, onUserSelected }) {
                       onClick={() => handleDelete(user)}
                       title="Remove user"
                     >
-                      <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
-                        <path d="M11 1.5v1h3.5a.5.5 0 010 1H13v9a1 1 0 01-1 1H4a1 1 0 01-1-1v-9H1.5a.5.5 0 010-1H5v-1A1.5 1.5 0 016.5 0h3A1.5 1.5 0 0111 1.5zm-5 0v1h4v-1a.5.5 0 00-.5-.5h-3a.5.5 0 00-.5.5zM5.5 5.5a.5.5 0 00-1 0v6a.5.5 0 001 0v-6zm2.5 0a.5.5 0 00-1 0v6a.5.5 0 001 0v-6zm2.5 0a.5.5 0 00-1 0v6a.5.5 0 001 0v-6z"/>
+                      <svg
+                        viewBox="0 0 16 16"
+                        width="12"
+                        height="12"
+                        fill="currentColor"
+                      >
+                        <path d="M11 1.5v1h3.5a.5.5 0 010 1H13v9a1 1 0 01-1 1H4a1 1 0 01-1-1v-9H1.5a.5.5 0 010-1H5v-1A1.5 1.5 0 016.5 0h3A1.5 1.5 0 0111 1.5zm-5 0v1h4v-1a.5.5 0 00-.5-.5h-3a.5.5 0 00-.5.5zM5.5 5.5a.5.5 0 00-1 0v6a.5.5 0 001 0v-6zm2.5 0a.5.5 0 00-1 0v6a.5.5 0 001 0v-6zm2.5 0a.5.5 0 00-1 0v6a.5.5 0 001 0v-6z" />
                       </svg>
                     </button>
                   </div>

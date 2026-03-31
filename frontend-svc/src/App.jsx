@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import { BrowserRouter as Router, Routes, Route, NavLink, useNavigate } from "react-router-dom";
 import HomePage from "./components/HomePage";
 import Users from "./components/Users";
@@ -93,6 +94,14 @@ function Layout({ currentUser, setCurrentUser }) {
     </div>
   );
 }
+
+Layout.propTypes = {
+  currentUser: PropTypes.shape({
+    id: PropTypes.number,
+    name: PropTypes.string,
+  }),
+  setCurrentUser: PropTypes.func.isRequired,
+};
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
