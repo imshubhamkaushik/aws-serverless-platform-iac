@@ -1,6 +1,7 @@
 import React from "react";
+import PropTypes from "prop-types";
 
-export default function HomePage({ currentUser, onGoToUsers, onGoToProducts }) {
+export default function HomePage({ onGoToUsers, onGoToProducts }) {
   return (
     <div className="page-wrapper">
       <div className="topbar">
@@ -108,3 +109,8 @@ export default function HomePage({ currentUser, onGoToUsers, onGoToProducts }) {
     </div>
   );
 }
+
+HomePage.propTypes = {
+  onGoToUsers: PropTypes.func.isRequired,
+  onGoToProducts: PropTypes.func.isRequired,
+};
