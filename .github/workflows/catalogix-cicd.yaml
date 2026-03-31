@@ -11,6 +11,7 @@ on:
       - "product-svc/**"
       - "frontend-svc/**"
       - ".github/workflows/catalogix-cicd.yaml"
+      - "pom.xml"
   workflow_run:
     workflows: ["Terraform Infrastructure"]
     types:
@@ -39,6 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     outputs:
       image_tag: ${{ steps.tag.outputs.image_tag }}
