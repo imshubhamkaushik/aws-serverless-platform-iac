@@ -100,7 +100,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup Java
-        uses: actions/setup-java@v4.7.0
+        uses: actions/setup-java@v5.1.0
         with:
           distribution: temurin
           java-version: "21"
@@ -130,14 +130,14 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.1.0
+        uses: aws-actions/configure-aws-credentials@v5.1.0
         with:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2.0.1
+        uses: aws-actions/amazon-ecr-login@v2
         id: ecr
 
       - name: Build Docker image - ${{ matrix.service }}
@@ -160,12 +160,14 @@ jobs:
             $CONTEXT
       
       - name: Trivy Security Scan - ${{ matrix.service }}
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1  # v0.35.0
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }}
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"
+          format: table
+          vuln-type: os,library
 
       - name: Push image to ECR - ${{ matrix.service }}
         run: |
@@ -190,14 +192,14 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4.1.0
+        uses: aws-actions/configure-aws-credentials@v5.1.0
         with:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2.0.1
+        uses: aws-actions/amazon-ecr-login@v2
         id: ecr
 
       - name: Download current Task Definition
@@ -208,14 +210,14 @@ jobs:
 
       - name: Fill in the new image ID in the Amazon ECS task definition
         id: render-task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1.6.2
+        uses: aws-actions/amazon-ecs-render-task-definition@v1.8.4
         with:
           task-definition: task-definition.json
           container-name: ${{ matrix.service }} # Match your container name in ECS
           image: ${{ steps.ecr.outputs.registry }}/${{ env.APP_NAME }}-${{ matrix.service }}:${{ needs.context.outputs.image_tag }}
 
       - name: Deploy Amazon ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2.3.1
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2.6.1
         with:
           task-definition: ${{ steps.render-task-def.outputs.task-definition }}
           service: ${{ matrix.service }}
