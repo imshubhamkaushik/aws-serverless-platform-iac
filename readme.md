@@ -132,8 +132,6 @@ Amazon RDS PostgreSQL (Private subnets)
 
 #### Diagram: High-Level AWS Architecture
 
-::contentReference[oaicite:0]{index=0}
-
 ##### Components to include:
 
 - VPC
@@ -606,26 +604,7 @@ GitHub Actions matrix jobs are used to build, scan, and deploy multiple services
 **Rationale**
 This mirrors how modern CI/CD systems handle microservices without duplicating pipeline logic.
 
-### 4. Non-Blocking Security & Code Quality Scans
-
-**Decision**
-Trivy security scans are included but configured as non-blocking.
-
-**Why**
-
-- Avoids deployment friction during early iterations
-- Keeps focus on platform reliability
-- Makes pipeline production-ready without enforcing premature gates
-
-**Trade-off**
-
-- Vulnerabilities do not automatically block deployments
-- Requires human review or future policy enforcement
-
-**Rationale**
-This reflects real-world maturity progression: visibility first, enforcement later.
-
-### 5. Terraform without Modules (Intentionally)
+### 4. Terraform without Modules (Intentionally)
 
 **Decision**
 Terraform modules were intentionally avoided.
@@ -644,7 +623,7 @@ Terraform modules were intentionally avoided.
 **Rationale**
 For a learning and portfolio project, transparency was prioritized over abstraction.
 
-### 6. Minimal Application Logic
+### 5. Minimal Application Logic
 
 **Decision**
 Application services are intentionally simple.
@@ -661,7 +640,7 @@ Application services are intentionally simple.
 **Rationale**
 The project’s goal is to demonstrate how services are built, shipped, and operated, not feature-rich applications.
 
-### 7. Observability as a First-Class Concern
+### 6. Observability as a First-Class Concern
 
 **Decision**
 CloudWatch logging is configured per service with defined retention.
@@ -679,11 +658,11 @@ CloudWatch logging is configured per service with defined retention.
 **Rationale**
 Logs are the foundational observability layer and are sufficient for this platform’s scope.
 
-### 8. `lifecycle { ignore_changes = [task_definition] }` on ECS Services
+### 7. `lifecycle { ignore_changes = [task_definition] }` on ECS Services
 
 Terraform is used to create the ECS infrastructure — cluster, task definitions, services, target groups. After initial creation, the CI/CD pipeline owns the task definition revision. Without `ignore_changes`, every subsequent `terraform apply` would try to revert the running task definition to the original `init` image, conflicting with any running deployments.
 
-### 9. ECR `scan_on_push` + Pipeline Trivy Scan
+### 8. ECR `scan_on_push` + Pipeline Trivy Scan
 
 Both layers are intentionally active. ECR's scan runs after the push, using AWS's managed scanning infrastructure. The pipeline Trivy scan runs before the push and blocks delivery of vulnerable images entirely. The ECR scan serves as an ongoing check against new CVEs that may be disclosed after the image was originally built.
 

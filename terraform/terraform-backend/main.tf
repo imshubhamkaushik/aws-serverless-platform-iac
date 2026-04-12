@@ -1,6 +1,6 @@
 # terraform-backend/main.tf
 
-# This Terraform configuration sets up the S3 bucket and DynamoDB table for Terraform state management.
+# This Terraform configuration sets up the S3 bucket Terraform state management.
 resource "aws_s3_bucket" "tf_state" {
   bucket        = "catalogix-terraform-state-dev"
   force_destroy = false # Protects against accidental deletion of the bucket and its contents
