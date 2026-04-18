@@ -18,7 +18,6 @@ public class CorsConfig {
     @Bean
     public WebMvcConfigurer corsConfigurer() {
 
-        @SuppressWarnings("null")
         String[] origins = Arrays.stream(allowedOrigins.split(","))
                                   .map(String::trim)
                                   .toArray(String[]::new);

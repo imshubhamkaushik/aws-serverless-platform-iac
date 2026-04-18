@@ -279,7 +279,7 @@ aws-serverless-platform-iac/
 │   └── Dockerfile
 │
 ├── terraform/
-│   ├── terraform-backend/          # S3 + KMS + DynamoDB — apply once before main infra
+│   ├── terraform-backend/          # S3 + KMS — apply once before main infra
 │   └── envs/dev/                   # Development environment — flat files, no modules
 │       ├── networking.tf           # VPC, 3 subnet tiers, IGW, NAT, route tables
 │       ├── security-groups.tf      # ALB SG, ECS SG, RDS SG
@@ -391,7 +391,7 @@ Deploy (main branch only)
 
 **There is also a separate `tf-destroy.yaml` workflow** triggered only by `workflow_dispatch` (manual). It runs `terraform destroy -auto-approve` and is intentionally not triggered by any push or schedule. This acts as a safety gate — destroying infrastructure always requires a deliberate manual action in the GitHub UI.
 
-**The composite action (`terraform-setup/action.yaml`)** is called by every job in both the infra and app pipelines to configure AWS credentials and set up Terraform. It accepts an `enable_terraform` flag (default: `true`) so jobs that only need AWS credentials — not Terraform — can set `enable_terraform: false` without duplicating the AWS credentials setup. `concurrency: group: terraform-dev` on the infra pipeline ensures two infra runs never execute simultaneously.
+The **composite action** (terraform-setup/action.yaml) is called by every job in the Terraform infrastructure pipeline (tf-infra.yaml) to configure AWS credentials and set up Terraform. The application pipeline (catalogix-cicd.yaml) calls aws-actions/configure-aws-credentials directly in the jobs that need it and does not use this composite action. The composite action accepts an enable_terraform flag (default: true) so jobs that only need AWS credentials — not Terraform — can set enable_terraform: false without duplicating the AWS credentials setup. concurrency: group: terraform-dev on the infra pipeline ensures two infra runs never execute simultaneously.
 
 ---
 
@@ -500,9 +500,9 @@ Three categories of alarms:
 - **ECS memory alarms** — same threshold and evaluation window, for memory
 - **ALB UnhealthyHostCount alarms** — triggers when any target group reports 1 or more unhealthy hosts, evaluated over 2 periods
 
-Both ECS alarms and ALB alarms use `for_each` over `local` maps (`ecs_services`, `target_groups`). All 9 alarms (3 CPU + 3 memory + 3 ALB) are generated from 2 resource blocks — not 9 separate resource definitions.
+Both ECS alarms and ALB alarms use `for_each` over `local` maps (`ecs_services`, `target_groups`). All 9 alarms (3 CPU + 3 memory + 3 ALB) are generated from 2 resource blocks (`ecs_cpu_high`, `ecs_memory_high`, `alb_unhealthy_hosts`) — not 9 separate resource definitions.
 
-The CloudWatch dashboard is also defined in Terraform (`aws_cloudwatch_dashboard`) with 8 widgets covering: CPU per service, memory per service, ALB request count, ALB target response time, ALB 5XX errors, and ALB unhealthy hosts. The dashboard is provisioned and updated by `terraform apply`.
+The CloudWatch dashboard is also defined in Terraform (`aws_cloudwatch_dashboard`) with 8 widgets. CPU and memory utilization widgets cover user-svc and product-svc only — the frontend service is stateless and its container metrics are not tracked in this dashboard. The remaining four widgets are ALB-level: request count, target response time, 5XX error count, and unhealthy host count (scoped to the frontend target group). The dashboard is provisioned and updated by terraform apply.
 
 ---
 
@@ -703,7 +703,6 @@ Both layers are intentionally active. ECR's scan runs after the push, using AWS'
 - Multi-environment support (staging / production)
 - HTTPS with ACM certificate on the ALB listener
 - AWS WAF protection
-- Autoscaling policies
 - Blue/green or canary deployments
 - GitHub OIDC authentication (remove long-lived access keys)
 - Advanced metrics and tracing
