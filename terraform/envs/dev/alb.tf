@@ -45,7 +45,7 @@ resource "aws_lb_listener_rule" "user_svc" {
   condition {
     path_pattern {
       # ADDED: /actuator/* so health checks reach the correct service
-      values = ["/users*", "/users/*", "/actuator/*"]
+      values = ["/users*", "/users/*"]
     }
   }
 }
@@ -63,7 +63,7 @@ resource "aws_lb_listener_rule" "product_svc" {
   condition {
     path_pattern {
       # ADDED: Actuator paths for product service
-      values = ["/products*", "/products/*", "/actuator/*"]
+      values = ["/products*", "/products/*"]
     }
   }
 }
@@ -101,7 +101,7 @@ resource "aws_lb_target_group" "user_svc" {
   }
 
   health_check {
-    path                = "/health"
+    path                = "/actuator/health"
     healthy_threshold   = 2
     unhealthy_threshold = 2
     timeout             = 5
@@ -123,7 +123,7 @@ resource "aws_lb_target_group" "product_svc" {
   }
 
   health_check {
-    path                = "/health"
+    path                = "/actuator/health"
     healthy_threshold   = 2
     unhealthy_threshold = 2
     timeout             = 5
