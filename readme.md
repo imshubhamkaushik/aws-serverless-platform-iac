@@ -1,56 +1,68 @@
 # Cloud-Native Infrastructure Automation & Containerized Deployment on AWS
 
-**GitHub Actions · Terraform · Docker · AWS · tfsec · Trivy**
+**GitHub Actions · Terraform · Docker · AWS ECS Fargate · tfsec · Trivy · Gitleaks**
+
+> A complete cloud-native platform on AWS for a containerized three-service application on Amazon ECS Fargate — focusing on infrastructure design, CI/CD automation, DevSecOps integration, and operational observability.
 
 ---
 
-This project provisions and operates a complete cloud-native platform on AWS for a containerized, three-service application deployed on Amazon ECS Fargate. The focus is on **infrastructure design, CI/CD automation, DevSecOps integration, and operational observability** — not application business logic.
+## Table of Contents
 
-The application — *Catalogix*, a product catalog with user management — is intentionally simple to keep the focus on how services are built, secured, deployed, and monitored.
-
----
-
-## Project Goals
-
-This project was built to demonstrate:
-
-- End-to-end infrastructure provisioning using Terraform
-- Running multiple services on ECS Fargate (serverless containers)
-- Secure CI/CD pipelines using GitHub Actions
-- DevSecOps practices including vulnerability and IaC scanning
-- Production-aligned networking and security design
-- Clear separation of infrastructure, deployment, and application concerns
-- Design decisions and trade-offs commonly made in real-world systems
-
----
-
-## Project Overview
-
-The platform provisions a complete AWS environment capable of running multiple services:
-
-### Services
-
-- Frontend service (React + Nginx)
-- Backend services (Spring Boot – User & Product)
-
-### Platform Components
-
-- Managed database (Amazon RDS PostgreSQL)
-- Container runtime (Amazon ECS Fargate)
-- Container registry (Amazon ECR)
-- Traffic routing (Application Load Balancer)
-- Secure credentials (AWS Secrets Manager)
-- Observability (CloudWatch Logs and Alarms)
-- CI/CD automation (GitHub Actions)
-- Infrastructure as Code (Terraform)
-
-The current implementation targets a development environment, with the repository structured to support future environments (staging / production).
+- [What this project demonstrates](#what-this-project-demonstrates)
+- [Tech stack](#tech-stack)
+- [Architecture](#architecture)
+  - [High-level architecture diagram](#high-level-architecture-diagram)
+  - [Infrastructure layers](#infrastructure-layers)
+  - [Networking and security design](#networking-and-security-design)
+- [CI/CD pipelines](#cicd-pipelines)
+  - [Application pipeline (catalogix-cicd.yaml)](#application-pipeline-catalogix-cicdyaml)
+  - [Infrastructure pipeline (tf-infra.yaml)](#infrastructure-pipeline-tf-infrayaml)
+- [Infrastructure design decisions](#infrastructure-design-decisions)
+- [Secrets management](#secrets-management)
+- [Observability](#observability)
+- [Repository structure](#repository-structure)
+- [How to run](#how-to-run)
+- [Design decisions and trade-offs](#design-decisions-and-trade-offs)
+- [Known limitations and future improvements](#known-limitations-and-future-improvements)
 
 ---
 
-## Architecture Overview
+## What this project demonstrates
 
-### High-Level Architecture
+The application — *Catalogix*, a product catalog with user management — is intentionally simple so it does not distract from what is actually being demonstrated.
+
+What is being demonstrated:
+
+- **Infrastructure as code** — complete AWS environment provisioned by flat Terraform files; no manual console configuration anywhere
+- **Secure CI/CD with GitHub Actions** — matrix builds run services in parallel; Trivy scans every image before it touches ECR; Gitleaks runs on every push; the pipeline does not report success until ECS confirms the new task is healthy
+- **Production-aligned ECS Fargate networking** — three distinct subnet tiers; RDS subnet has no default route (isolated at the routing table level, not just the security group level); ECS tasks are not publicly accessible
+- **Secrets without credentials in code** — DB credentials injected at container startup by the ECS agent via Secrets Manager; no secret is stored in the pipeline, in environment files, or in Terraform state as plaintext
+- **Observability as code** — all CloudWatch log groups, alarms (9 total), and the metrics dashboard are provisioned by Terraform; no manual console setup
+- **Pipeline chaining** — the app pipeline triggers automatically after the infra pipeline completes successfully via `workflow_run`, ensuring infrastructure changes land before application deployments
+
+---
+
+## Tech stack
+
+| Category | Tools |
+|---|---|
+| Cloud | AWS (ECS Fargate, RDS PostgreSQL, ECR, ALB, Secrets Manager, CloudWatch, IAM) |
+| IaC | Terraform (flat files, no modules — intentional) |
+| CI/CD | GitHub Actions (matrix jobs, composite actions, pipeline chaining) |
+| Containerisation | Docker (multi-stage builds) |
+| Security scanning | Trivy (images — CRITICAL/HIGH, exit-code 1), tfsec (IaC — blocking), Gitleaks (secrets) |
+| Secrets | AWS Secrets Manager + ECS task execution role |
+| Monitoring | CloudWatch (logs, CPU/memory/ALB alarms, metrics dashboard) |
+| Application | Spring Boot (user-svc :8081, product-svc :8082), React + Nginx (frontend-svc :80) |
+| Database | PostgreSQL 15 on Amazon RDS |
+
+---
+
+## Architecture
+
+### High-level architecture diagram
+
+> The diagram below renders on GitHub. A static image is also available at `docs/architecture.png`.
 
 ```mermaid
 flowchart TD
@@ -89,7 +101,7 @@ flowchart TD
                 US[user-svc\nFargate — 512 CPU / 1024 MB]
                 PS[product-svc\nFargate — 512 CPU / 1024 MB]
             end
-            subgraph PrivateRDS["Private Subnets — RDS\n(No NAT route)"]
+            subgraph PrivateRDS["Private DB Subnets\n(No default route — isolated at routing level)"]
                 RDS[(RDS PostgreSQL 15\ndb.t4g.micro)]
             end
         end
@@ -97,6 +109,7 @@ flowchart TD
         SM[Secrets Manager\nDB credentials]
         CW[CloudWatch\nLogs + Alarms + Dashboard]
         NAT[NAT Gateway]
+        TFS3[S3 + KMS CMK\nTerraform State]
     end
 
     ALB --> FE & US & PS
@@ -108,151 +121,232 @@ flowchart TD
     AppPipeline -->|deploy| AWS
 ```
 
-### Request flow:
+### Request flow
+
 ```
 Client
   ↓
-Application Load Balancer
+Application Load Balancer  (public subnets)
+  ↓  path-based rules
+ECS Fargate Services — frontend / user-svc / product-svc  (private ECS subnets)
   ↓
-ECS Fargate Services (Frontend / Backend) (Private Subnets)
-  ↓
-Amazon RDS PostgreSQL (Private subnets)
+Amazon RDS PostgreSQL  (private DB subnets — no default route)
 ```
 
-### Key characteristics:
+### Infrastructure layers
 
-- ALB runs in public subnets.
-- ECS services run in private subnets.
-- NAT Gateway provides outbound internet access.
-- RDS is isolated in private DB subnets, not publicly accessible.
-- Services communicate via internal networking.
-- Health checks ensure traffic reaches only healthy tasks.
+```
+terraform/
+├── terraform-backend/          # S3 + KMS CMK — apply once before main infra
+│                               # S3: versioned, force_destroy=false, all public access blocked
+│                               # KMS: CMK for SSE (you control the key, not AWS)
+└── envs/dev/                   # Development environment — flat Terraform, no modules
+    ├── networking.tf           # VPC, 3 subnet tiers, IGW, NAT Gateway, route tables
+    ├── security-groups.tf      # ALB SG, ECS SG, RDS SG (port 5432 from ECS SG only)
+    ├── alb.tf                  # ALB, HTTP listener, path-based listener rules, target groups
+    ├── ecs.tf                  # ECS cluster, task definitions (secrets block), services
+    ├── ecr.tf                  # ECR repos, scan_on_push, lifecycle policy (last 10 images)
+    ├── rds.tf                  # RDS PostgreSQL 15, encrypted, no public access
+    ├── secrets.tf              # Secrets Manager secret for DB credentials
+    ├── iam.tf                  # ECS execution role (GetSecretValue scoped), ECS task role
+    ├── cloudwatch.tf           # Log groups, CPU/mem/ALB alarms (for_each), dashboard
+    ├── autoscaling.tf          # App autoscaling — CPU + memory target tracking per service
+    ├── outputs.tf
+    ├── variables.tf
+    └── providers.tf
+```
 
-### Architecture Diagrams
+Terraform modules were intentionally avoided to keep all resource relationships explicit and visible in one place. A change to the ECS task definition is in `ecs.tf`, its security group is in `security-groups.tf`, its IAM role is in `iam.tf` — nothing is hidden inside a module.
 
-#### Diagram: High-Level AWS Architecture
+### Networking and security design
 
-##### Components to include:
+Three distinct subnet tiers in the VPC, each with separate routing:
 
-- VPC
-- Public Subnets → ALB
-- Private Subnets → ECS Tasks
-- RDS in private subnets
-- ECR
-- CloudWatch
-- Secrets Manager
+**Public subnets** — ALB lives here. Internet Gateway provides inbound access. `map_public_ip_on_launch = true` for the ALB.
 
-##### Explanation (AWS Architecture)
+**Private ECS subnets** — Fargate tasks run here. NAT Gateway provides outbound access for ECR image pulls and Secrets Manager calls. ECS tasks have `assign_public_ip = false`.
 
-- Client traffic enters through an Application Load Balancer.  
-- The ALB routes requests to ECS services running on Fargate in private subnets via NAT Gateway for outbound access.
-- Services pull container images from ECR via NAT Gateway and store data in RDS.  
-- Logs are shipped to CloudWatch.
+**Private RDS subnets** — RDS lives here with its own route table that has **no default route** — not even to the NAT Gateway. The only path into this subnet is via the RDS security group rule allowing port 5432 from the ECS security group. Restricting routing at the subnet level is an additional isolation layer beyond the security group alone.
 
-##### Explanation (CI/CD Pipeline)
+Subnet CIDRs are computed dynamically with `cidrsubnet(var.vpc_cidr, 4, index)`:
+- Public subnets: offsets 0–1
+- ECS private subnets: offsets 4–5
+- RDS private subnets: offsets 8–9
 
-- Each commit triggers a GitHub Actions workflow.  
-- The pipeline builds Docker images, pushes them to ECR, and updates ECS services using new task definitions.
-- IAM user is used for authentication.
+Security controls summary:
 
----
-
-### Networking & Security Architecture
-
-#### Network Design
-
-- Custom VPC with CIDR planning
-- Public subnets → ALB
-- Private app subnets → ECS tasks
-- Private DB subnets → RDS
-- NAT Gateway for secure outbound traffic
-- Internet Gateway for inbound ALB traffic
-
-#### Security Controls
-
-- Least-privilege IAM roles
-- ECS accessible only via ALB
-- RDS accessible only from ECS
-- No public database exposure
-- Secrets stored in AWS Secrets Manager
-- Private workloads with controlled ingress
+| Control | Where | Notes |
+|---|---|---|
+| Secrets never in code | ECS `secrets` block → Secrets Manager | ECS agent injects at startup; no human ever handles the value |
+| RDS not publicly accessible | Terraform + routing table | No default route in RDS subnet; SG port 5432 from ECS SG only |
+| ECS not publicly accessible | `assign_public_ip = false` | Only reachable via ALB |
+| Image vulnerability scanning | Trivy (pre-push, blocking) + ECR `scan_on_push` | Two independent layers |
+| IaC security scanning | tfsec — `soft_fail: false` | Any finding fails the pipeline |
+| Secret scanning | Gitleaks on every push | Runs before build |
+| Terraform state encryption | KMS CMK (Customer Managed Key) | Key usage logged to CloudTrail |
+| State bucket protection | `force_destroy = false` | Cannot be deleted by Terraform accidentally |
 
 ---
 
-### AWS Infrastructure
+## CI/CD Pipelines
 
-Provisioned using Terraform.
+### Application pipeline (`catalogix-cicd.yaml`)
 
-#### Compute & Containers
+**Trigger logic:**
+- `push` to `main` — path filters: only `user-svc/`, `product-svc/`, `frontend-svc/`, `pom.xml`, or the workflow file itself
+- `workflow_run` — triggers automatically after the Terraform Infrastructure pipeline completes successfully on `main`
+- `workflow_dispatch` — manual trigger
 
-- ECS Cluster (Fargate)
-- Service-per-microservice architecture
-- Target groups & health checks
-- Rolling deployments
+`concurrency: group: catalogix-main, cancel-in-progress: true` — if a new commit arrives while a pipeline is running, the in-progress run is cancelled and only the latest commit is deployed.
 
-#### Database
+```
+Phase 0 — Pipeline Context
+  └── Generate image tag: MAJOR_VERSION-github.run_number (once, shared by all downstream jobs)
 
-- Amazon RDS PostgreSQL
-- Private subnets only
-- Security group isolation
-- Credentials stored in Secrets Manager
+Phase 1A — Frontend Build
+  └── npm ci + npm run build (Node.js 22, npm cache keyed to package-lock.json)
 
-#### Observability
+Phase 1B — Backend Build + Test  (matrix: user-svc, product-svc — parallel)
+  └── mvn install -N (parent POM)
+  └── mvn clean verify (unit + integration tests per service)
 
-- CloudWatch log groups per service
-- ECS CPU alarms
-- ALB health alarms
-- Metrics dashboard
+Phase 2 — Docker Build + Trivy Scan + ECR Push  (matrix: all 3 services — parallel)
+  └── docker build --pull --cache-from ECR --build-arg BUILDKIT_INLINE_CACHE=1
+  └── Trivy image scan — CRITICAL,HIGH — ignore-unfixed — exit-code 1
+  └── docker push (only if Trivy passes)
+
+Phase 3 — Deploy to ECS  (matrix: all 3 services — parallel)
+  └── Download current task definition from ECS
+  └── Render new task definition with updated image tag
+  └── Deploy + wait-for-service-stability (pipeline does not succeed until ECS confirms healthy)
+
+Final Summary  (always runs)
+  └── Aggregated pass/fail — exits non-zero if any matrix job failed
+```
+
+**Key pipeline decisions:**
+
+**Matrix jobs for homogeneous service operations.** Phases 1B, 2, and 3 all use `strategy.matrix`. Adding a fourth service requires one entry in the matrix — no pipeline duplication. `fail-fast: true` cancels sibling builds immediately if one fails.
+
+**Build cache from ECR.** `--cache-from` pointing to an existing ECR cache layer with `BUILDKIT_INLINE_CACHE=1` reuses unchanged layers from ECR on subsequent builds, reducing build time significantly for Maven dependency resolution.
+
+**Trivy runs before ECR push — not after.** If a CRITICAL or HIGH unfixed vulnerability is found, the image is never pushed. ECR `scan_on_push` is also enabled as an ongoing secondary check for CVEs disclosed after the original build.
+
+**Image tag generated once in Phase 0.** A single `context` job generates the tag and all downstream jobs reference it. If each job generated its own tag, different phases could produce different tags for the same commit.
+
+**`wait-for-service-stability: true`.** The pipeline does not report success until ECS confirms the new task definition is running and healthy targets exist in the ALB target group.
+
+**Pipeline chaining via `workflow_run`.** Infrastructure changes are applied first; the application deploys automatically on the same commit. Without this, an infra change and an app change could deploy the app before infra was ready.
+
+### Infrastructure pipeline (`tf-infra.yaml`)
+
+```
+Bootstrap
+  └── Check if S3 backend bucket exists (aws s3api head-bucket)
+  └── If missing: terraform init + terraform apply in terraform-backend/
+  └── S3: force_destroy=false, versioning enabled, SSE with Customer Managed KMS key
+
+Quality Checks
+  └── terraform fmt -check -recursive    (fails if any file is not formatted)
+  └── terraform validate
+  └── tfsec — soft_fail: false           (any finding fails the pipeline)
+
+Plan
+  └── terraform plan -out main.tfplan
+  └── Upload artifact: main.tfplan + .terraform.lock.hcl
+
+Deploy  (main branch only)
+  └── Download artifact
+  └── terraform init -input=false
+  └── terraform apply --auto-approve main.tfplan
+```
+
+`concurrency: group: terraform-dev` ensures two infra runs never execute simultaneously.
+
+**Composite action** (`terraform-setup/action.yaml`) is called by every Terraform pipeline job to configure AWS credentials and set up Terraform. It accepts an `enable_terraform` flag (default: `true`) so jobs that need only AWS credentials — not Terraform — can set `enable_terraform: false` without duplicating the AWS credentials setup.
+
+**Destroy workflow** (`tf-destroy.yaml`) is triggered only by `workflow_dispatch` (manual). Destroying infrastructure always requires a deliberate manual action in the GitHub UI — it is never triggered by a push.
 
 ---
 
-### 📦 Infrastructure as Code (Terraform)
+## Infrastructure Design
 
-Terraform provisions:
+### ECS task definitions (`ecs.tf`)
 
-- VPC & networking
-- ECS cluster & services
-- ALB & routing
-- RDS database
-- IAM roles & policies
-- ECR repositories
-- CloudWatch monitoring
-- Secrets Manager
+| Service | CPU | Memory | Port |
+|---|---|---|---|
+| frontend-svc | 256 | 512 MB | 80 |
+| user-svc | 512 | 1024 MB | 8081 |
+| product-svc | 512 | 1024 MB | 8082 |
 
-#### Terraform Pipeline Highlights
+Backend services receive DB credentials via the ECS `secrets` block — not environment variables. The `valueFrom` field references the Secrets Manager secret ARN directly. The ECS agent injects the values at container startup.
 
-- Remote state bootstrap (S3 backend)
-- Security scanning via tfsec
-- Automated plan & apply workflow
-- Environment-ready structure
-- Re-usable composite GitHub Action
+All three ECS services have `lifecycle { ignore_changes = [task_definition, desired_count] }`. Without this, every `terraform apply` after the first deployment would try to revert the running task definition to the original `init` image tag. The CI/CD pipeline owns the task definition after initial provisioning.
+
+`health_check_grace_period_seconds = 90` on backend services covers JVM startup + Spring context initialization. Without this, ECS registers the task with the ALB before the application is ready, health checks fail, and ECS kills and restarts the task in a loop.
+
+CloudWatch log driver uses `mode = "non-blocking"` with `max-buffer-size = "25m"`. In blocking mode, if CloudWatch Logs is temporarily unavailable, the container's logging calls block and can cause the application to hang.
+
+### ALB and path-based routing (`alb.tf`)
+
+A single ALB routes to all three services using listener rule priorities:
+- Priority 10: `/users*` and `/users/*` → user-svc target group (port 8081)
+- Priority 20: `/products*` and `/products/*` → product-svc target group (port 8082)
+- Default: all other traffic → frontend-svc target group (port 80)
+
+Target type is `ip` (required for Fargate — Fargate tasks do not use EC2 instance IDs).
+
+Both backend target groups have `lifecycle { create_before_destroy = true }` to prevent downtime during target group replacements.
+
+### Autoscaling (`autoscaling.tf`)
+
+All three services and their autoscaling configurations are defined in a single `local` map (`autoscaling_config`). The `aws_appautoscaling_target` and `aws_appautoscaling_policy` resources use `for_each` over this map. Adding autoscaling for a new service requires one entry in the map.
+
+| Setting | Value |
+|---|---|
+| CPU target | 70% |
+| Memory target | 75% |
+| Minimum tasks | 1 per service |
+| Maximum tasks | 2 per service |
+| Scale-out cooldown | 60s |
+| Scale-in cooldown | 300s |
+
+### CloudWatch monitoring (`cloudwatch.tf`)
+
+All 9 alarms (3 CPU + 3 memory + 3 ALB unhealthy-host) are generated from 2 `resource` blocks using `for_each` — not 9 separate resource definitions. The CloudWatch dashboard (8 widgets) is provisioned and updated by `terraform apply`.
 
 ---
 
-### 🔑 Secrets Management
+## Secrets Management
 
-Database credentials are stored in AWS Secrets Manager.
+DB credentials are stored in AWS Secrets Manager. No secret is in source code, environment files, or in a CI/CD credential store.
 
-ECS tasks retrieve credentials via IAM roles.
+**Flow:**
 
-No secrets are stored in source code or environment files.
+1. Terraform creates the Secrets Manager secret and stores DB credentials at `${project_name}/database-credentials`
+2. The ECS task execution role has an inline policy granting `secretsmanager:GetSecretValue` scoped to only this secret ARN
+3. At container startup, the ECS agent reads the secret and injects the values as environment variables via the `secrets` block in the task definition
+4. The application reads standard `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` environment variables — no code change needed if the secret rotates
 
----
-
-### Monitoring and Observability
-
-CloudWatch provides
-
-- Container logs
-- ECS CPU Alarms
-- Metrics dashboards
-- ALB health alarms
-
-Logs enable rapid debugging and operational visibility.
+`recovery_window_in_days = 0` is set so the secret is deleted immediately on `terraform destroy` rather than being held for 30 days — appropriate for a dev environment where re-provisioning is expected.
 
 ---
 
-## 📂 Repository Structure
+## Observability
+
+CloudWatch provides centralized observability across all services. Everything is provisioned by Terraform — no manual console configuration.
+
+| Component | Details |
+|---|---|
+| Log groups | Per-service, 7-day retention |
+| ECS CPU alarms | Per service — triggers above 80% over 2 consecutive 60s periods |
+| ECS memory alarms | Same threshold and evaluation window |
+| ALB unhealthy-host alarms | Triggers when any target group reports 1+ unhealthy hosts |
+| Dashboard | 8 widgets — CPU/memory for backend services, ALB request count, response time, 5XX count, unhealthy hosts |
+
+---
+
+## Repository Structure
 
 ```
 aws-serverless-platform-iac/
@@ -261,7 +355,7 @@ aws-serverless-platform-iac/
 │   ├── workflows/
 │   │   ├── catalogix-cicd.yaml     # Application CI/CD — matrix build, scan, deploy
 │   │   ├── tf-infra.yaml           # Infrastructure pipeline — bootstrap, quality, plan, apply
-│   │   └── tf-destroy.yaml         # Manual-only destroy workflow (workflow_dispatch)
+│   │   └── tf-destroy.yaml         # Manual-only destroy workflow (workflow_dispatch only)
 │   └── actions/
 │       └── terraform-setup/
 │           └── action.yaml         # Composite action — AWS credentials + Terraform setup
@@ -279,398 +373,38 @@ aws-serverless-platform-iac/
 │   └── Dockerfile
 │
 ├── terraform/
-│   ├── terraform-backend/          # S3 + KMS — apply once before main infra
+│   ├── terraform-backend/          # S3 + KMS CMK — apply once before main infra
 │   └── envs/dev/                   # Development environment — flat files, no modules
 │       ├── networking.tf           # VPC, 3 subnet tiers, IGW, NAT, route tables
 │       ├── security-groups.tf      # ALB SG, ECS SG, RDS SG
-│       ├── alb.tf                  # ALB, HTTP listener, path-based listener rules, target groups
+│       ├── alb.tf                  # ALB, HTTP listener, path-based listener rules
 │       ├── ecs.tf                  # ECS cluster, task definitions, services
 │       ├── ecr.tf                  # ECR repositories, scan_on_push, lifecycle policy
-│       ├── rds.tf                  # RDS PostgreSQL 15, db.t4g.micro
+│       ├── rds.tf                  # RDS PostgreSQL 15, db.t4g.micro, encrypted
 │       ├── secrets.tf              # Secrets Manager secret for DB credentials
 │       ├── iam.tf                  # ECS execution role, ECS task role
-│       ├── cloudwatch.tf           # Log groups, CPU/memory/ALB alarms, dashboard
-│       ├── autoscaling.tf          # App autoscaling — CPU + memory target tracking per service
+│       ├── cloudwatch.tf           # Log groups, alarms (for_each), dashboard
+│       ├── autoscaling.tf          # App autoscaling — CPU + memory target tracking
 │       ├── outputs.tf
 │       ├── variables.tf
 │       └── providers.tf
 │
-└── pom.xml                         # Parent POM for Maven multi-module build
-```
-
-Terraform modules were intentionally avoided to keep the infrastructure explicit and reviewable.
-
----
-
-## CI/CD Pipeline — Application Delivery (`catalogix-cicd.yaml`)
-
-### Trigger Logic
-
-The application pipeline triggers on three conditions:
-- `push` to `main` — but only when files under `user-svc/`, `product-svc/`, `frontend-svc/`, or the pipeline file itself are changed (path filters prevent unnecessary runs on unrelated commits)
-- `workflow_run` — automatically after the Terraform Infrastructure pipeline completes successfully on `main`, so a fresh infrastructure deployment is immediately followed by an application deployment
-- `workflow_dispatch` — manual trigger
-
-`concurrency: group: catalogix-main, cancel-in-progress: true` ensures that if a new commit arrives while a pipeline is running, the in-progress run is cancelled and only the latest commit is deployed.
-
-### Pipeline Phases
-
-```
-Phase 0 — Pipeline Context (runs once)
-  └── Generate image tag: MAJOR_VERSION-github.run_number
-      └── Passed as output to all downstream jobs
-
-Phase 1A — Frontend Build (matrix: frontend-svc)
-  └── npm ci + npm run build
-  └── Node.js 22, npm cache keyed to package-lock.json
-
-Phase 1B — Backend Build + Test (matrix: user-svc, product-svc — parallel)
-  └── mvn -B install -N (parent POM, no submodules)
-  └── mvn -B -f <service>/pom.xml clean verify (unit + integration tests)
-
-Phase 2 — Docker Build + Trivy Scan + ECR Push (matrix: all 3 services — parallel)
-  └── docker build --pull
-      --cache-from ECR cache layer
-      --build-arg BUILDKIT_INLINE_CACHE=1
-  └── Trivy image scan — CRITICAL,HIGH — ignore-unfixed — exit-code 1
-  └── docker push (only if Trivy passes)
-
-Phase 3 — Deploy to ECS (matrix: all 3 services — parallel)
-  └── Download current task definition from ECS
-  └── Render new task definition with updated image tag
-  └── Deploy + wait-for-service-stability
-
-Final Summary (always runs)
-  └── Aggregated pass/fail across all matrix jobs
-  └── Exits non-zero if any phase failed
-```
-
-### Key Pipeline Decisions
-
-**Matrix jobs for homogeneous service operations.** Phases 1B, 2, and 3 all use `strategy.matrix` over the list of services. Adding a fourth service requires adding one entry to the matrix — no pipeline duplication. `fail-fast: true` on the build matrix means if one service fails to build, the other builds are cancelled immediately rather than continuing to consume runner minutes.
-
-**Build cache from ECR.** The Docker build step uses `--cache-from` pointing to an existing ECR cache layer and `--build-arg BUILDKIT_INLINE_CACHE=1` to embed cache metadata in the pushed image. This means subsequent builds reuse unchanged layers from ECR instead of rebuilding from scratch, reducing build time especially for Maven dependency resolution.
-
-**Trivy runs before ECR push — not after.** The `aquasecurity/trivy-action` step runs in the same matrix job as the build, before `docker push`. If a CRITICAL or HIGH vulnerability is found, the image is never pushed to ECR. ECR also has `scan_on_push = true` configured in Terraform as a secondary scan layer, but the primary gate is the pre-push Trivy check.
-
-**Image tag generated once in Phase 0 and passed via job outputs.** If each job generated its own tag independently, different phases could produce different tags for the same commit under certain conditions. A single `context` job generates `MAJOR_VERSION-${{ github.run_number }}` and all downstream jobs reference `${{ needs.context.outputs.image_tag }}`.
-
-**`wait-for-service-stability: true` in ECS deployment.** The GitHub Actions ECS deploy step waits for the ECS service to report stable before the pipeline job completes. This means the pipeline does not report success until ECS has confirmed that the new task definition is running and healthy targets exist in the ALB target group.
-
-**Pipeline chaining via `workflow_run`.** The app pipeline watches for completion of the Terraform Infrastructure pipeline via the `workflow_run` trigger with `conclusion == 'success'`. This creates a dependency: infrastructure changes are applied first, then the application is deployed automatically on the same commit. Without this, an infra change and an app change landing simultaneously could deploy the app before infra was ready.
-
----
-
-## Infrastructure Pipeline (`tf-infra.yaml`)
-
-Four sequential jobs protect infrastructure changes from being applied carelessly.
-
-```
-Bootstrap
-  └── Check if S3 backend bucket exists (aws s3api head-bucket)
-  └── If missing: terraform init + terraform apply in terraform-backend/
-  └── S3 bucket is protected — force_destroy = false, public access fully blocked,
-      versioning enabled, SSE with Customer Managed KMS key
-
-Quality Checks
-  └── terraform init
-  └── terraform fmt -check -recursive  (fails if any file is not properly formatted)
-  └── terraform validate
-  └── tfsec — soft_fail: false (blocking — any tfsec finding fails the pipeline)
-
-Plan
-  └── terraform plan -out main.tfplan
-  └── Upload artifact: main.tfplan + .terraform.lock.hcl
-      (lock file included to guarantee the same provider versions are used in apply)
-
-Deploy (main branch only)
-  └── Download artifact
-  └── terraform init -input=false
-  └── terraform apply --auto-approve main.tfplan
-```
-
-**There is also a separate `tf-destroy.yaml` workflow** triggered only by `workflow_dispatch` (manual). It runs `terraform destroy -auto-approve` and is intentionally not triggered by any push or schedule. This acts as a safety gate — destroying infrastructure always requires a deliberate manual action in the GitHub UI.
-
-The **composite action** (terraform-setup/action.yaml) is called by every job in the Terraform infrastructure pipeline (tf-infra.yaml) to configure AWS credentials and set up Terraform. The application pipeline (catalogix-cicd.yaml) calls aws-actions/configure-aws-credentials directly in the jobs that need it and does not use this composite action. The composite action accepts an enable_terraform flag (default: true) so jobs that only need AWS credentials — not Terraform — can set enable_terraform: false without duplicating the AWS credentials setup. concurrency: group: terraform-dev on the infra pipeline ensures two infra runs never execute simultaneously.
-
----
-
-## Infrastructure Design
-
-All infrastructure for this project is written as flat Terraform files with no modules. Module abstraction was intentionally avoided to keep all resource relationships visible in one place and to make the code easier to trace during review. A change to the ECS task definition is in `ecs.tf`. The security group that controls what can reach it is in `security-groups.tf`. The IAM role it uses is in `iam.tf`. Nothing is hidden inside a module.
-
-### Networking (`networking.tf`)
-
-Three distinct subnet tiers in the VPC:
-
-**Public subnets** — ALB lives here. Internet Gateway provides inbound access. `map_public_ip_on_launch = true` for ALB.
-
-**Private ECS subnets** — Fargate tasks run here. NAT Gateway provides outbound access for ECR image pulls and Secrets Manager calls. ECS tasks have `assign_public_ip = false`.
-
-**Private RDS subnets** — RDS lives here with its own route table that has no default route — not even to the NAT Gateway. The only path into this subnet is via the RDS security group rule that allows port 5432 from the ECS security group. Restricting routing at the subnet level is an additional layer of isolation beyond just the security group.
-
-Subnet CIDRs are computed dynamically with `cidrsubnet(var.vpc_cidr, 4, index)`. Public subnets use offsets 0–1, ECS private subnets use offsets 4–5, RDS private subnets use offsets 8–9. This keeps the CIDR plan readable and avoids overlap.
-
-### ECS Task Definitions (`ecs.tf`)
-
-Each service has its own task definition with separately sized resources:
-
-| Service | CPU | Memory | Port |
-|---|---|---|---|
-| frontend-svc | 256 | 512 MB | 80 |
-| user-svc | 512 | 1024 MB | 8081 |
-| product-svc | 512 | 1024 MB | 8082 |
-
-Backend services receive DB credentials via the ECS `secrets` block, not environment variables. The `valueFrom` field references the Secrets Manager secret ARN directly:
-
-```hcl
-secrets = [
-  {
-    name      = "SPRING_DATASOURCE_USERNAME"
-    valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:username::"
-  },
-  {
-    name      = "SPRING_DATASOURCE_PASSWORD"
-    valueFrom = "${aws_secretsmanager_secret.db_credentials.arn}:password::"
-  }
-]
-```
-
-The ECS task execution role has a dedicated inline policy granting `secretsmanager:GetSecretValue` scoped to only the DB credentials secret ARN. The credential values are injected at container startup by the ECS agent, not stored anywhere in the task definition or environment.
-
-**All three ECS services have `lifecycle { ignore_changes = [task_definition, desired_count] }`**. Without this, every `terraform apply` after the first deployment would try to revert the task definition back to the `init` image tag that was hardcoded at resource creation time. The CI/CD pipeline owns the task definition after initial provisioning — Terraform should not fight it.
-
-**Backend services have `health_check_grace_period_seconds = 90`**. The JVM takes significantly longer to start than the ALB health check interval. Without the grace period, ECS registers the task with the ALB before the Spring Boot application is ready to serve requests, the health check fails, and ECS kills and restarts the task in a loop. 90 seconds covers the full JVM startup + Spring context initialization.
-
-**CloudWatch log driver uses `mode = "non-blocking"` with `max-buffer-size = "25m"`**. In blocking mode, if CloudWatch Logs is temporarily unavailable or experiencing throttling, the container's logging calls block — which can cause the application to hang. Non-blocking mode writes to a 25 MB in-memory buffer. If the buffer fills, log entries are dropped rather than blocking the process.
-
-### ALB and Path-Based Routing (`alb.tf`)
-
-A single ALB in public subnets routes to all three services using listener rule priorities:
-
-- Priority 10: `/users*` and `/users/*` → user-svc target group (port 8081)
-- Priority 20: `/products*` and `/products/*` → product-svc target group (port 8082)
-- Default action: all other traffic → frontend-svc target group (port 80)
-
-Target type is `ip` (required for Fargate — Fargate tasks do not register with EC2 instance IDs).
-
-**The `/actuator/*` path pattern was added to the user-svc and product-svc listener rules.** During initial testing, ALB health checks were failing because the health check path (`/health`) was routed to the frontend target group by the default rule, not to the backend services. Adding `/actuator/*` to the backend listener rules ensures health check traffic reaches the correct service.
-
-Both backend target groups have `lifecycle { create_before_destroy = true }` to prevent downtime during target group replacements. If a target group needs to be recreated, the new one is created first, traffic is shifted, and the old one is destroyed.
-
-### ECR Repositories (`ecr.tf`)
-
-Each service has a dedicated ECR repository with:
-- `scan_on_push = true` — ECR runs its own vulnerability scan on every image push, independent of the Trivy scan in the pipeline
-- ECR lifecycle policy keeping the last 10 images. Older images are expired automatically to control storage costs
-- `force_delete = true` — allows the repository to be deleted with images still in it during `terraform destroy`. This is appropriate for development and explicitly commented as not suitable for production
-
-The lifecycle policy JSON is defined once in a `local` and referenced by all three repository resources to avoid copying the same JSON block three times.
-
-### Secrets Management (`secrets.tf`)
-
-DB credentials are stored in Secrets Manager under `${project_name}/database-credentials`. `recovery_window_in_days = 0` is set so the secret is deleted immediately on `terraform destroy` rather than being retained for 30 days — appropriate for a development environment where re-provisioning is expected.
-
-### Autoscaling (`autoscaling.tf`)
-
-Application autoscaling uses target tracking policies for both CPU and memory on all three services:
-- CPU target: 70% — scale out when average CPU across tasks exceeds 70%
-- Memory target: 75%
-- Minimum tasks: 1, Maximum tasks: 2 per service
-- Scale-out cooldown: 60 seconds (add capacity quickly under load)
-- Scale-in cooldown: 300 seconds (wait 5 minutes before removing capacity to avoid flapping)
-
-All three services and their autoscaling configurations are defined in a single `local` map (`autoscaling_config`). The `aws_appautoscaling_target` and `aws_appautoscaling_policy` resources use `for_each` over this map. Adding autoscaling for a new service requires only one entry in the map.
-
-### Terraform Backend (`terraform-backend/`)
-
-The S3 backend uses a Customer Managed KMS key (CMK) for server-side encryption instead of the default SSE-S3. The distinction: with SSE-S3, AWS manages the encryption key and any AWS employee or process with S3 access can theoretically decrypt the data. With CMK, the key is in your AWS account and you control who can use it. KMS key usage is also logged to CloudTrail.
-
-The S3 bucket has:
-- Versioning enabled — previous Terraform state versions are retained and recoverable
-- All public access blocked (four separate settings)
-- `force_destroy = false` — the bucket cannot be deleted by Terraform unless explicitly overridden, protecting against accidental state loss
-
-### CloudWatch Monitoring (`cloudwatch.tf`)
-
-Log groups are defined with 7-day retention. All CloudWatch configuration — log groups, alarms, and the dashboard — is provisioned by Terraform as code, not configured manually in the console.
-
-Three categories of alarms:
-- **ECS CPU alarms** — triggers when average CPU exceeds 80% across 2 consecutive 60-second periods, per service
-- **ECS memory alarms** — same threshold and evaluation window, for memory
-- **ALB UnhealthyHostCount alarms** — triggers when any target group reports 1 or more unhealthy hosts, evaluated over 2 periods
-
-Both ECS alarms and ALB alarms use `for_each` over `local` maps (`ecs_services`, `target_groups`). All 9 alarms (3 CPU + 3 memory + 3 ALB) are generated from 2 resource blocks (`ecs_cpu_high`, `ecs_memory_high`, `alb_unhealthy_hosts`) — not 9 separate resource definitions.
-
-The CloudWatch dashboard is also defined in Terraform (`aws_cloudwatch_dashboard`) with 8 widgets. CPU and memory utilization widgets cover user-svc and product-svc only — the frontend service is stateless and its container metrics are not tracked in this dashboard. The remaining four widgets are ALB-level: request count, target response time, 5XX error count, and unhealthy host count (scoped to the frontend target group). The dashboard is provisioned and updated by terraform apply.
-
----
-
-## Infrastructure Deployment
-
-### Provision Infrastructure
-
-```bash
-cd terraform/envs/dev
-terraform init
-terraform plan
-terraform apply
+└── pom.xml                         # Maven parent POM — multi-module build coordination
 ```
 
 ---
 
-## Deployment & Rollback Strategy
+## How to Run
 
-### Deployment
+### Prerequisites
 
-- ECS services use rolling deployments
-- New task definition revisions are registered per deployment
-- ALB ensures traffic is routed only to healthy tasks
+- AWS account (ap-south-1 by default — change `AWS_REGION` in both workflow files)
+- Terraform >= 1.14.0
+- AWS CLI configured with IAM credentials that have sufficient permissions
+- GitHub repository with the required secrets and variables configured (see below)
 
-### Rollback (Conceptual)
+### Required GitHub Secrets
 
-- ECS retains previous task definition revisions
-- Rollback can be performed by redeploying a previous stable revision
-- No additional tooling is required
-
----
-
-## Testing
-
-- Backend services include basic unit and integration tests
-- CI fails fast on build or test errors
-- Testing scope kept minimal to emphasize infrastructure & automation
-
----
-
-## Design Decisions & Trade-offs
-
-Below are the key architectural decisions and the trade-offs behind them.
-
-### 1. ECS Fargate over EC2 / EKS
-
-**Decision**
-ECS Fargate was chosen as the container runtime instead of EC2-backed ECS or Kubernetes (EKS).
-
-**Why**
-
-- No node management or AMI lifecycle
-- Native AWS integration (ALB, IAM, CloudWatch)
-- Faster time-to-production for small teams
-
-**Trade-off**
-
-- Less control over underlying compute
-- Vendor lock-in compared to Kubernetes
-
-**Rationale**
-For a DevOps-focused platform demonstrating AWS-native design, Fargate offers the best balance between operational simplicity and production realism.
-
-### 2. Single ALB with Path-Based Routing over Per-service ALBs
-
-**Decision**
-A single Application Load Balancer routes traffic to multiple services using path-based rules.
-
-**Why**
-
-- Cost-efficient
-- Centralized ingress
-- Simple to reason about request flow
-
-**Trade-off**
-
-- Shared blast radius if ALB misconfigured
-- Less isolation than per-service ALBs
-
-**Rationale**
-This reflects a common real-world pattern for early-stage or internal platforms, while remaining extensible for future isolation if required.
-
-### 3. Matrix-Based CI/CD Pipelines
-
-**Decision**
-GitHub Actions matrix jobs are used to build, scan, and deploy multiple services in parallel.
-
-**Why**
-
-- Clear per-service isolation
-- Faster pipelines through parallelism
-- Scales naturally as services are added
-
-**Trade-off**
-
-- Slightly more complex YAML
-- Aggregated job status requires careful handling
-
-**Rationale**
-This mirrors how modern CI/CD systems handle microservices without duplicating pipeline logic.
-
-### 4. Terraform without Modules (Intentionally)
-
-**Decision**
-Terraform modules were intentionally avoided.
-
-**Why**
-
-- Improves readability for reviewers
-- Makes resource relationships explicit
-- Easier to trace during interviews
-
-**Trade-off**
-
-- Less DRY
-- Harder to scale across many environments
-
-**Rationale**
-For a learning and portfolio project, transparency was prioritized over abstraction.
-
-### 5. Minimal Application Logic
-
-**Decision**
-Application services are intentionally simple.
-
-**Why**
-
-- Keeps focus on infrastructure, CI/CD, and deployment
-- Avoids conflating backend engineering with platform engineering
-
-**Trade-off**
-
-- Limited business logic depth
-
-**Rationale**
-The project’s goal is to demonstrate how services are built, shipped, and operated, not feature-rich applications.
-
-### 6. Observability as a First-Class Concern
-
-**Decision**
-CloudWatch logging is configured per service with defined retention.
-
-**Why**
-
-- Enables debugging and post-deployment visibility
-- Avoids silent failures
-- Mirrors production expectations
-
-**Trade-off**
-
-- No advanced tracing or metrics dashboards yet
-
-**Rationale**
-Logs are the foundational observability layer and are sufficient for this platform’s scope.
-
-### 7. `lifecycle { ignore_changes = [task_definition] }` on ECS Services
-
-Terraform is used to create the ECS infrastructure — cluster, task definitions, services, target groups. After initial creation, the CI/CD pipeline owns the task definition revision. Without `ignore_changes`, every subsequent `terraform apply` would try to revert the running task definition to the original `init` image, conflicting with any running deployments.
-
-### 8. ECR `scan_on_push` + Pipeline Trivy Scan
-
-Both layers are intentionally active. ECR's scan runs after the push, using AWS's managed scanning infrastructure. The pipeline Trivy scan runs before the push and blocks delivery of vulnerable images entirely. The ECR scan serves as an ongoing check against new CVEs that may be disclosed after the image was originally built.
-
----
-
-## Required GitHub Secrets and Variables
-
-### Secrets
 | Secret | Description |
 |---|---|
 | `AWS_ACCESS_KEY_ID` | IAM user access key |
@@ -678,39 +412,88 @@ Both layers are intentionally active. ECR's scan runs after the push, using AWS'
 | `DB_USERNAME` | RDS master username |
 | `DB_PASSWORD` | RDS master password |
 
-### Variables
+> **Note:** These use long-lived IAM user credentials. Migrating to GitHub OIDC (OpenID Connect) with an IAM role is planned as the next improvement — it removes all long-lived access keys. See [Future Improvements](#known-limitations-and-future-improvements).
+
+### Required GitHub Variables
+
 | Variable | Description |
 |---|---|
-| `PROJECT_NAME` | Project name prefix for all resources |
-| `VPC_CIDR` | VPC CIDR block |
-| `PUBLIC_SUBNET_CIDRS` | Public subnet CIDR list |
-| `PRIVATE_SUBNET_CIDRS` | Private subnet CIDR list |
+| `PROJECT_NAME` | Project name prefix for all AWS resources |
+| `VPC_CIDR` | VPC CIDR block (e.g. `10.0.0.0/16`) |
+| `PUBLIC_SUBNET_CIDRS` | Public subnet CIDR list (JSON array) |
+| `PRIVATE_SUBNET_CIDRS` | Private subnet CIDR list (JSON array) |
+
+### Step 1 — Provision Infrastructure
+
+Push a change to any file under `terraform/` to the `main` branch. The `tf-infra.yaml` pipeline runs automatically:
+
+1. Creates the S3 + KMS Terraform state backend if it does not exist
+2. Runs `terraform fmt`, `terraform validate`, and `tfsec` (blocking)
+3. Generates a plan and uploads it as an artifact
+4. Applies the plan on `main`
+
+Or run manually from the GitHub Actions UI (workflow_dispatch).
+
+### Step 2 — Deploy the Application
+
+The application pipeline (`catalogix-cicd.yaml`) triggers automatically after the infrastructure pipeline completes on `main`. You can also trigger it manually or by pushing a change to any service directory.
+
+### Step 3 — Destroy Infrastructure
+
+Trigger `tf-destroy.yaml` manually from the GitHub Actions UI. Destroying infrastructure requires a deliberate manual action — it cannot be triggered by a push.
 
 ---
 
-## Current Scope and Known Limitations
+## Design Decisions and Trade-offs
 
-- HTTP only. HTTPS with ACM is documented as a future improvement in the ALB Terraform comments.
-- Static IAM credentials. The next improvement is GitHub OIDC authentication to remove long-lived access keys, which is already referenced in the `info` section and pipeline permissions.
-- Single NAT Gateway. Cost-appropriate for development; a production setup would use one NAT Gateway per AZ.
-- RDS `skip_final_snapshot = true` and `deletion_protection = false`. Both are appropriate for a dev environment where data loss is acceptable.
-- No Gitleaks or SonarQube in the application pipeline. Static analysis and secret scanning are present in the companion Jenkins project. Future addition noted.
+### 1. ECS Fargate over EC2 / EKS
+
+Fargate removes node management entirely. No AMI lifecycle, no node patching, no cluster upgrade maintenance window. For a DevOps-focused project demonstrating AWS-native design, Fargate offers the best balance between operational simplicity and production realism.
+
+**Trade-off:** Less control over underlying compute. Vendor lock-in compared to Kubernetes. No fine-grained scheduling constraints.
+
+### 2. Single ALB with path-based routing over per-service ALBs
+
+One ALB routes traffic to all three services using listener rule priorities. Cost-efficient and simple to reason about request flow.
+
+**Trade-off:** Shared blast radius if the ALB is misconfigured. Less isolation than per-service ALBs.
+
+### 3. Matrix-based CI/CD
+
+GitHub Actions matrix jobs run build, scan, and deploy for all services in parallel. Adding a fourth service requires one entry in the matrix — no pipeline duplication. `fail-fast: true` cancels sibling jobs immediately if one fails.
+
+**Trade-off:** Aggregated job status requires careful handling (the Final Summary job collects results across all matrix jobs).
+
+### 4. Terraform without modules (intentional)
+
+All resource relationships are visible in one place. A reviewer can trace a complete flow — task definition in `ecs.tf`, its security group in `security-groups.tf`, its IAM role in `iam.tf` — without navigating module boundaries.
+
+**Trade-off:** Less DRY. Does not scale well if this platform were extended to 10+ environments or services.
+
+### 5. `lifecycle { ignore_changes = [task_definition] }` on ECS services
+
+After initial provisioning, the CI/CD pipeline owns the task definition revision. Without this, every `terraform apply` would try to revert the running task definition to the `init` image tag hardcoded at resource creation time.
+
+### 6. ECR `scan_on_push` alongside pipeline Trivy
+
+Trivy runs before the push and blocks delivery of vulnerable images. ECR's scan runs after the push using AWS's managed scanning infrastructure. The ECR scan acts as an ongoing check against CVEs disclosed after the image was originally built — two independent scanning layers with different purposes.
+
+### 7. RDS subnet routing isolation
+
+The RDS private subnets have their own route table with no default route — not even to the NAT Gateway. This is an additional isolation layer beyond the security group rule that allows only port 5432 from the ECS security group. If the security group were ever misconfigured, the routing table provides a second line of defence.
 
 ---
 
-## Future Improvements
+## Known Limitations and Future Improvements
 
-- Multi-environment support (staging / production)
-- HTTPS with ACM certificate on the ALB listener
-- AWS WAF protection
-- Blue/green or canary deployments
-- GitHub OIDC authentication (remove long-lived access keys)
-- Advanced metrics and tracing
-- Per-AZ NAT Gateways for production networking
-- Gitleaks secret scanning added to the application pipeline
-- Terraform modules
-- SonarCloud integration (permissions block already includes `pull-requests: write` for SonarCloud PR comments)
-
-Notes
-
-Terraform modules were intentionally avoided to keep infrastructure readable and traceable for learning and review purposes. Will introduce later.
+| Limitation | Status / Planned fix |
+|---|---|
+| Static IAM credentials | Replace with GitHub OIDC — IAM role assumed via OIDC token, no long-lived access keys. `permissions: id-token: write` is already set in both workflow files. |
+| HTTP only | Add ACM certificate + HTTPS listener — exact annotations are documented in `alb.tf` comments |
+| Single NAT Gateway | One NAT Gateway per AZ for production multi-AZ HA |
+| `skip_final_snapshot = true` on RDS | Change to `false` in any environment where data loss is unacceptable |
+| `deletion_protection = false` on RDS | Enable in staging and production |
+| No Gitleaks in app pipeline | Currently in the companion Jenkins project. Future addition noted. |
+| No SonarQube / SonarCloud | `pull-requests: write` permission is already in place for future SonarCloud PR comments |
+| Terraform modules | Flat files are intentional for readability; modules will be introduced for multi-environment scale |
+| Single environment (dev only) | `envs/staging/` and `envs/prod/` directory structure is planned |
