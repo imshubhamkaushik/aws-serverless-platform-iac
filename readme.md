@@ -349,7 +349,7 @@ CloudWatch provides centralized observability across all services. Everything is
 ## Repository Structure
 
 ```
-aws-serverless-platform-iac/
+aws-ecs-fargate-iac/
 │
 ├── .github/
 │   ├── workflows/
